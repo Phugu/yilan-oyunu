@@ -1,0 +1,238 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg-dark: #0a0e17;
+  --bg-grid: #0d1321;
+  --accent: #00ff88;
+  --accent-glow: rgba(0, 255, 136, 0.5);
+  --danger: #ff3366;
+  --danger-glow: rgba(255, 51, 102, 0.5);
+  --text: #e0e6ed;
+  --text-muted: #6b7a8c;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--bg-dark);
+  background-image:
+    linear-gradient(rgba(0, 255, 136, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 136, 0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.game-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 800px;
+  padding: 0.5rem 1rem;
+}
+
+.logo {
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 900;
+  font-size: 1.75rem;
+  letter-spacing: 0.15em;
+  color: var(--text);
+}
+
+.logo .io {
+  color: var(--accent);
+  text-shadow: 0 0 20px var(--accent-glow);
+}
+
+.score-board {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  background: rgba(13, 19, 33, 0.9);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 255, 136, 0.2);
+}
+
+.score-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+
+.score-value {
+  font-weight: 600;
+  color: var(--accent);
+  text-shadow: 0 0 10px var(--accent-glow);
+  margin-left: 0.25rem;
+}
+
+.game-wrapper {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 2px rgba(0, 255, 136, 0.3),
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    inset 0 0 80px rgba(0, 255, 136, 0.02);
+}
+
+#gameCanvas {
+  display: block;
+  background: #0f0f1a;
+  width: 100%;
+  max-width: 800px;
+  height: auto;
+  border-radius: 12px;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 14, 23, 0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.overlay.hidden {
+  display: none;
+}
+
+.overlay h2 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 2rem;
+  color: var(--accent);
+  text-shadow: 0 0 30px var(--accent-glow);
+}
+
+.overlay p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.overlay .final-score {
+  color: var(--text);
+  font-size: 1.2rem;
+}
+
+.overlay .final-score span {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.btn {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  padding: 0.9rem 2rem;
+  background: transparent;
+  color: var(--accent);
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 0.5rem;
+}
+
+.btn:hover {
+  background: var(--accent);
+  color: var(--bg-dark);
+  box-shadow: 0 0 30px var(--accent-glow);
+  transform: scale(1.05);
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.footer {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  letter-spacing: 0.1em;
+}
+
+@media (max-width: 840px) {
+  #gameCanvas {
+    width: 100vw;
+    max-width: 100%;
+  }
+
+  .header {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .logo {
+    font-size: 1.4rem;
+  }
+}
+
+.kill-feed {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 250px;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.kill-msg {
+  background: rgba(10, 14, 23, 0.8);
+  color: #e0e6ed;
+  padding: 0.5rem 1rem;
+  border-left: 3px solid #ff3366;
+  font-size: 0.8rem;
+  font-family: 'JetBrains Mono', monospace;
+  animation: slideIn 0.3s ease-out forwards;
+  backdrop-filter: blur(4px);
+  border-radius: 4px;
+  opacity: 1;
+  transition: opacity 0.5s ease;
+}
+
+.kill-msg span {
+  font-weight: bold;
+  color: #00ff88;
+}
+
+.kill-msg .victim {
+  color: #ff3366;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}

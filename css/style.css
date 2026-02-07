@@ -1,0 +1,249 @@
+html,
+body {
+    margin: 0;
+    height: 100%;
+    background: #0b0f18;
+    overflow: hidden;
+}
+
+canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+}
+
+.hud {
+    position: fixed;
+    left: 12px;
+    top: 12px;
+    color: #d7e3ff;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    font-size: 14px;
+    user-select: none;
+    opacity: .95;
+    background: rgba(10, 14, 24, .55);
+    border: 1px solid rgba(255, 255, 255, .08);
+    padding: 10px 12px;
+    border-radius: 12px;
+    backdrop-filter: blur(8px);
+    line-height: 1.25;
+    max-width: 440px;
+}
+
+.hud b {
+    color: #fff;
+}
+
+.hint {
+    opacity: .8;
+    font-size: 12px;
+    margin-top: 6px;
+}
+
+.lb {
+    position: fixed;
+    right: 12px;
+    top: 12px;
+    width: 260px;
+    color: #d7e3ff;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    font-size: 13px;
+    user-select: none;
+    opacity: .95;
+    background: rgba(10, 14, 24, .55);
+    border: 1px solid rgba(255, 255, 255, .08);
+    padding: 10px 12px;
+    border-radius: 12px;
+    backdrop-filter: blur(8px);
+}
+
+.lb h3 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+}
+
+.lb ol {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.lb li {
+    margin: 4px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.lb .you {
+    margin-top: 8px;
+    font-size: 12px;
+    opacity: .85;
+}
+
+.dead {
+    position: fixed;
+    inset: 0;
+    display: none;
+    place-items: center;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    color: #e8f0ff;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.dead .card {
+    background: rgba(10, 14, 24, .72);
+    border: 1px solid rgba(255, 255, 255, .10);
+    border-radius: 18px;
+    padding: 18px 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(10px);
+    min-width: 300px;
+}
+
+.dead .card h1 {
+    margin: 0 0 6px;
+    font-size: 20px;
+}
+
+.dead .card p {
+    margin: 0;
+    opacity: .9;
+}
+
+.dead .card .small {
+    margin-top: 10px;
+    font-size: 12px;
+    opacity: .75;
+}
+
+/* Kill Feed */
+.kill-feed {
+    position: fixed;
+    right: 12px;
+    top: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 260px;
+    pointer-events: none;
+    z-index: 100;
+}
+
+.kill-msg {
+    background: rgba(10, 14, 24, .7);
+    color: #d7e3ff;
+    padding: 6px 10px;
+    border-left: 3px solid #ff3366;
+    font-size: 12px;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    border-radius: 4px;
+    backdrop-filter: blur(4px);
+    animation: killFadeIn 0.3s ease-out forwards;
+}
+
+.kill-msg span {
+    font-weight: 700;
+    color: #00ff88;
+}
+
+.kill-msg .victim {
+    color: #ff3366;
+}
+
+
+@keyframes killFadeIn {
+    from {
+        transform: translateX(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Menu Overlay */
+.menu-overlay {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: rgba(11, 15, 24, 0.95);
+    z-index: 1000;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    color: #fff;
+}
+
+.menu-overlay .card {
+    background: rgba(10, 14, 24, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+    padding: 30px;
+    text-align: center;
+    backdrop-filter: blur(20px);
+    width: 320px;
+}
+
+
+.menu-overlay h1 {
+    font-size: 28px;
+    margin: 0 0 10px;
+    background: linear-gradient(135deg, #00ff88, #00ccff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.menu-overlay p {
+    margin: 0 0 20px;
+    opacity: 0.8;
+}
+
+.menu-overlay input {
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 12px 16px;
+    border-radius: 12px;
+    color: #fff;
+    font-size: 16px;
+    margin-bottom: 20px;
+    outline: none;
+    transition: 0.2s;
+}
+
+.menu-overlay input:focus {
+    border-color: #00ff88;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.menu-overlay button {
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    border: none;
+    background: linear-gradient(135deg, #00ff88, #00ccff);
+    color: #0b0f18;
+    font-weight: 800;
+    font-size: 16px;
+    cursor: pointer;
+    transition: 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.menu-overlay button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 255, 136, 0.3);
+}
+
+.menu-overlay .hint {
+    margin-top: 15px;
+    opacity: 0.5;
+    font-size: 11px;
+}

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="tr">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Snake.io (Boost + Leaderboard + Bot Kişilikleri)</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+  <canvas id="c"></canvas>
+
+  <div id="startOverlay" class="menu-overlay">
+    <div class="card">
+      <h1>Yılan Siyaseti</h1>
+      <p>Bir isim seç ve maceraya başla!</p>
+      <input type="text" id="playerNameInput" placeholder="İsmin nedir?" maxlength="12">
+      <button id="startButton">OYNA</button>
+      <div class="hint">Shift: Hızlan | Fare: Yön</div>
+    </div>
+  </div>
+
+  <div class="hud">
+    Skor: <b id="score">0</b> | En Yüksek: <b id="highScore">0</b> | Uzunluk: <b id="len">10</b> | Enerji: <b
+      id="energy">10.0s</b> | Bot: <b id="bots">0</b>
+    <div class="hint">Fare: yön | Shift: hızlanma (maliyetli) | R: yeniden doğ</div>
+  </div>
+
+  <div id="killFeed" class="kill-feed"></div>
+
+  <div class="lb">
+    <h3>Leaderboard</h3>
+    <ol id="lbList"></ol>
+    <div class="you" id="lbYou"></div>
+  </div>
+
+  <div class="dead" id="deadOverlay">
+    <div class="card">
+      <h1>Öldün.</h1>
+      <p>Yılan siyaseti bir kez daha çuvalladı.</p>
+      <div class="small">R'ye bas: yeniden doğ</div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="js/main.js?v=40"></script>
+</body>
+
+</html>
