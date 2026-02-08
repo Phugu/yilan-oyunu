@@ -308,6 +308,8 @@ export function checkCollision(s) {
     if (head.x <= 0 || head.x >= world.w || head.y <= 0 || head.y >= world.h) {
         killSnake(s); return;
     }
+    // Self-collision disabled as requested
+    /*
     for (let i = 10; i < s.segments.length; i++) {
         const seg = s.segments[i];
         const rr = (s.baseRadius * 0.70 + seg.r * 0.60);
@@ -315,6 +317,7 @@ export function checkCollision(s) {
             killSnake(s); return;
         }
     }
+    */
     for (const o of state.snakes) {
         if (o === s || o.dead) continue;
         const oh = o.segments[0];
