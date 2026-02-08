@@ -51,6 +51,8 @@ playerNameInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") startButton.click();
 });
 
+initPhysics(); // Move up to prevent wiping socket state later
+
 // Socket Init
 state.socket = io();
 
@@ -63,10 +65,22 @@ state.socket.on('init', (data) => {
 
     // Add existing players
     data.players.forEach(p => {
-        if (p.id !== state.myId) state.otherPlayers.set(p.id, p);
+        if (p.id !== state.myId) {
+            state.otherPlayers.set(p.id, p);
+            // Also add to snakes array with targets initialized
+            p.targetX = p.x;
+            p.targetY = p.y;
+            p.targetAng = p.ang;
+            p.targetSegments = p.segments;
+            state.snakes.push(p);
+        }
     });
     // Add bots
     data.bots.forEach(b => {
+        b.targetX = b.x;
+        b.targetY = b.y;
+        b.targetAng = b.ang;
+        b.targetSegments = b.segments;
         state.snakes.push(b);
     });
 });
@@ -81,6 +95,10 @@ state.socket.on('playerUpdate', (p) => {
         let s = state.snakes.find(s => s.id === p.id);
         if (!s) {
             s = p;
+            s.targetX = p.x;
+            s.targetY = p.y;
+            s.targetAng = p.ang;
+            s.targetSegments = p.segments;
             state.snakes.push(s);
         } else {
             // Set targets for lerping
@@ -128,6 +146,10 @@ state.socket.on('botUpdates', (botList) => {
         let s = state.snakes.find(s => s.id === b.id);
         if (!s) {
             s = b;
+            s.targetX = b.x;
+            s.targetY = b.y;
+            s.targetAng = b.ang;
+            s.targetSegments = b.segments;
             state.snakes.push(s);
         } else {
             // Set targets for lerping/smoothing
@@ -308,6 +330,5 @@ function loop() {
     }
 }
 
-initPhysics();
 resize();
 loop();
