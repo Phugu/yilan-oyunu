@@ -214,6 +214,34 @@ canvas {
     gap: 10px;
 }
 
+.control-toggle-btn {
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(10, 14, 24, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    transition: all 0.2s;
+    z-index: 100;
+}
+
+.control-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(0, 255, 136, 0.4);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.control-toggle-btn:active {
+    transform: translateX(-50%) scale(0.95);
+}
+
 /* Menu Overlay */
 .menu-overlay {
     position: fixed;
