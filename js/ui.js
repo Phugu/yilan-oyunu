@@ -30,7 +30,6 @@ export const ui = {
         if (!state.player) return;
         scoreEl.innerText = Math.floor(state.player.score).toLocaleString();
         lenEl.innerText = state.player.targetLen.toFixed(1);
-        botsEl.innerText = state.snakes.length - 1;
 
         // High Score logic
         let savedHighScore = localStorage.getItem("snake_high_score") || 0;
