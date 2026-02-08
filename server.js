@@ -121,7 +121,6 @@ function updateBots(dt) {
         if (ai.retargetT <= 0) {
             ai.retargetT = rand(0.5, 1.5);
             let bestFood = null, bestD2 = Infinity;
-            // Scan for nearby food
             const scanCount = Math.min(gameState.foods.length, 30);
             for (let k = 0; k < scanCount; k++) {
                 const f = gameState.foods[(Math.random() * gameState.foods.length) | 0];
@@ -141,7 +140,6 @@ function updateBots(dt) {
             targetY = targetFood.y;
         }
 
-        // Avoid boundaries
         const margin = 400;
         if (b.x < margin) targetX = b.x + 1000;
         if (b.x > world.w - margin) targetX = b.x - 1000;
@@ -157,11 +155,9 @@ function updateBots(dt) {
         b.x += b.vx * dt;
         b.y += b.vy * dt;
 
-        // Head update
         head.x = b.x;
         head.y = b.y;
 
-        // Follow segments
         for (let i = 1; i < b.segments.length; i++) {
             const prev = b.segments[i - 1];
             const seg = b.segments[i];
@@ -175,7 +171,6 @@ function updateBots(dt) {
             }
         }
 
-        // Eat food
         const eatDist2 = (b.baseRadius * 1.5) * (b.baseRadius * 1.5);
         for (let i = gameState.foods.length - 1; i >= 0; i--) {
             const f = gameState.foods[i];
@@ -191,27 +186,28 @@ function updateBots(dt) {
                 }
                 spawnFood(1);
                 io.emit('foodSpawned', gameState.foods[gameState.foods.length - 1]);
-                break; // One food per tick
+                break;
             }
         }
 
-        // Server-side Collision for bots
-        // against walls
+        // Server-side Collision
         if (b.x < 0 || b.x > world.w || b.y < 0 || b.y > world.h) {
             b.dead = true;
             io.emit('playerKilled', { victimId: b.id });
             return;
         }
 
-        // against other snakes
         const allSnakes = [...Array.from(gameState.players.values()), ...bots];
         for (const other of allSnakes) {
-            if (other.id === b.id || other.dead) continue;
+            if (other.dead) continue;
+            const isSelf = other.id === b.id;
 
-            for (let i = 0; i < other.segments.length; i++) {
-                if (other.id === b.id && i < 10) continue; // Skip head self-collision
+            for (let i = 0; i < (other.segments || []).length; i++) {
+                if (isSelf && i < 15) continue; // Skip own head + some body
                 const seg = other.segments[i];
-                const collDist = (b.baseRadius * 0.7 + (seg.r || 10) * 0.7);
+                if (!seg) continue;
+                const otherR = seg.r || 10;
+                const collDist = (b.baseRadius * 0.65 + otherR * 0.65);
                 if (dist2(b.x, b.y, seg.x, seg.y) < collDist * collDist) {
                     b.dead = true;
                     io.emit('playerKilled', { victimId: b.id, killerId: other.id });
@@ -222,14 +218,13 @@ function updateBots(dt) {
     });
 }
 
-// Tick loop
 setInterval(() => {
     try {
-        updateBots(0.05); // 20Hz
+        updateBots(0.05);
         io.emit('botUpdates', bots.map(b => ({
             id: b.id, name: b.name, x: b.x, y: b.y, ang: b.ang, hue: b.hue,
             score: b.score, segments: b.segments, targetLen: b.targetLen,
-            dead: b.dead
+            dead: b.dead, baseRadius: b.baseRadius
         })));
     } catch (e) {
         console.error("Bot update error:", e);
@@ -258,9 +253,10 @@ io.on('connection', (socket) => {
             score: 0,
             targetLen: 10,
             dead: false,
+            baseRadius: 12,
             segments: []
         };
-        for (let k = 0; k < 10; k++) player.segments.push({ x: player.x, y: player.y });
+        for (let k = 0; k < 10; k++) player.segments.push({ x: player.x, y: player.y, r: 10.8 });
         gameState.players.set(socket.id, player);
         io.emit('playerJoined', player);
     });

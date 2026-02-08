@@ -100,6 +100,7 @@ state.socket.on('init', (data) => {
             p.targetY = p.y;
             p.targetAng = p.ang;
             p.targetSegments = p.segments;
+            p.baseRadius = p.baseRadius || 12;
             state.snakes.push(p);
         }
     });
@@ -109,6 +110,7 @@ state.socket.on('init', (data) => {
         b.targetY = b.y;
         b.targetAng = b.ang;
         b.targetSegments = b.segments;
+        b.baseRadius = b.baseRadius || 12;
         state.snakes.push(b);
     });
 });
@@ -137,6 +139,7 @@ state.socket.on('playerUpdate', (p) => {
             s.score = p.score;
             s.targetLen = p.targetLen;
             s.name = p.name;
+            s.baseRadius = p.baseRadius || 12;
         }
     }
 });
@@ -188,6 +191,7 @@ state.socket.on('botUpdates', (botList) => {
             s.score = b.score;
             s.targetLen = b.targetLen;
             s.dead = b.dead;
+            s.baseRadius = b.baseRadius || 12;
         }
     });
 });
