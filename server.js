@@ -171,7 +171,7 @@ function updateBots(dt) {
             }
         }
 
-        const eatDist2 = (b.baseRadius * 1.5) * (b.baseRadius * 1.5);
+        const eatDist2 = (b.baseRadius * 1.8) * (b.baseRadius * 1.8);
         for (let i = gameState.foods.length - 1; i >= 0; i--) {
             const f = gameState.foods[i];
             if (dist2(b.x, b.y, f.x, f.y) < eatDist2) {
@@ -190,7 +190,7 @@ function updateBots(dt) {
             }
         }
 
-        // Server-side Collision
+        // --- ENHANCED SERVER-SIDE COLLISION ---
         if (b.x < 0 || b.x > world.w || b.y < 0 || b.y > world.h) {
             b.dead = true;
             io.emit('playerKilled', { victimId: b.id });
@@ -202,12 +202,15 @@ function updateBots(dt) {
             if (other.dead) continue;
             const isSelf = other.id === b.id;
 
-            for (let i = 0; i < (other.segments || []).length; i++) {
-                if (isSelf && i < 15) continue; // Skip own head + some body
-                const seg = other.segments[i];
+            const segs = other.segments || [];
+            for (let i = 0; i < segs.length; i++) {
+                if (isSelf && i < 6) continue; // Skip own head
+                const seg = segs[i];
                 if (!seg) continue;
-                const otherR = seg.r || 10;
-                const collDist = (b.baseRadius * 0.65 + otherR * 0.65);
+
+                const otherR = seg.r || 10.8;
+                // Increased collision distance factor from 0.65 to 0.85 to account for network latency
+                const collDist = (b.baseRadius * 0.85 + otherR * 0.85);
                 if (dist2(b.x, b.y, seg.x, seg.y) < collDist * collDist) {
                     b.dead = true;
                     io.emit('playerKilled', { victimId: b.id, killerId: other.id });
