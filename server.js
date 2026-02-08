@@ -264,6 +264,14 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('requestFullState', () => {
+        socket.emit('fullState', {
+            players: Array.from(gameState.players.values()),
+            bots: bots,
+            foods: gameState.foods
+        });
+    });
+
     socket.on('heartbeat', () => {
         // Just keep alive
     });

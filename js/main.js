@@ -198,6 +198,64 @@ state.socket.on('playerKilled', (data) => {
     }
 });
 
+// Full state sync for catch-up after Alt-Tab
+state.socket.on('fullState', (data) => {
+    // Sync foods
+    state.foods = data.foods;
+    state.foodGrid.clear();
+    state.foods.forEach(f => addFoodToGrid(f));
+
+    // Sync snakes (players + bots)
+    const activeIds = new Set();
+
+    // Process players
+    data.players.forEach(p => {
+        activeIds.add(p.id);
+        let s = state.snakes.find(snake => snake.id === p.id);
+        if (!s) {
+            s = p;
+            s.targetX = p.x; s.targetY = p.y; s.targetAng = p.ang;
+            s.targetSegments = p.segments;
+            s.baseRadius = p.baseRadius || 12;
+            if (p.id !== state.myId) state.snakes.push(s);
+        } else {
+            Object.assign(s, p);
+            s.targetX = p.x; s.targetY = p.y; s.targetAng = p.ang;
+        }
+    });
+
+    // Process bots
+    data.bots.forEach(b => {
+        activeIds.add(b.id);
+        let s = state.snakes.find(snake => snake.id === b.id);
+        if (!s) {
+            s = b;
+            s.targetX = b.x; s.targetY = b.y; s.targetAng = b.ang;
+            s.targetSegments = b.segments;
+            s.baseRadius = b.baseRadius || 12;
+            state.snakes.push(s);
+        } else {
+            Object.assign(s, b);
+            s.targetX = b.x; s.targetY = b.y; s.targetAng = b.ang;
+        }
+    });
+
+    // Remove stale snakes
+    for (let i = state.snakes.length - 1; i >= 0; i--) {
+        const s = state.snakes[i];
+        if (s.isPlayer && s.id === state.myId) continue;
+        if (!activeIds.has(s.id)) {
+            state.snakes.splice(i, 1);
+        }
+    }
+});
+
+window.addEventListener('focus', () => {
+    if (state.gameStarted && state.socket) {
+        state.socket.emit('requestFullState');
+    }
+});
+
 state.socket.on('botUpdates', (botList) => {
     botList.forEach(b => {
         let s = state.snakes.find(s => s.id === b.id);
