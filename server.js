@@ -75,7 +75,7 @@ function createBot(i) {
         segDist: 9.5,
         baseRadius: 12,
         dead: false,
-        spawnGrace: 2.0, // 2 seconds invincibility
+        spawnGrace: 2.0,
         ai: {
             targetFoodId: null,
             retargetT: 0
@@ -107,11 +107,7 @@ function respawnBot(b) {
 
 function updateBots(dt) {
     bots.forEach(b => {
-        if (b.dead) {
-            respawnBot(b);
-            return;
-        }
-
+        if (b.dead) { respawnBot(b); return; }
         if (b.spawnGrace > 0) b.spawnGrace -= dt;
 
         const ai = b.ai;
@@ -133,11 +129,9 @@ function updateBots(dt) {
 
         let tx = b.x + Math.cos(b.ang) * 100;
         let ty = b.y + Math.sin(b.ang) * 100;
-
         const targetFood = gameState.foods.find(f => f.id === ai.targetFoodId);
         if (targetFood) { tx = targetFood.x; ty = targetFood.y; }
 
-        // Stronger wall avoidance
         const m = 500;
         if (b.x < m) tx = b.x + 1000;
         else if (b.x > world.w - m) tx = b.x - 1000;
@@ -153,9 +147,7 @@ function updateBots(dt) {
         b.x += b.vx * dt;
         b.y += b.vy * dt;
 
-        head.x = b.x;
-        head.y = b.y;
-
+        head.x = b.x; head.y = b.y;
         for (let i = 1; i < b.segments.length; i++) {
             const prev = b.segments[i - 1];
             const seg = b.segments[i];
@@ -168,7 +160,6 @@ function updateBots(dt) {
             }
         }
 
-        // Eat Food
         const rr = b.baseRadius * 1.6;
         const rr2 = rr * rr;
         for (let i = gameState.foods.length - 1; i >= 0; i--) {
@@ -189,9 +180,7 @@ function updateBots(dt) {
             }
         }
 
-        // Collision
         if (b.spawnGrace > 0) return;
-
         if (b.x < 0 || b.x > world.w || b.y < 0 || b.y > world.h) {
             b.dead = true;
             io.emit('playerKilled', { victimId: b.id });
@@ -216,15 +205,50 @@ function updateBots(dt) {
     });
 }
 
+function updatePlayers(dt) {
+    gameState.players.forEach(p => {
+        if (p.dead) return;
+        const speed = p.wantsBoost ? 350 : 190;
+        if (p.targetAng !== undefined) {
+            const da = wrapAngle(p.targetAng - p.ang);
+            p.ang += clamp(da, -6.8 * dt, 6.8 * dt);
+        }
+        p.x += Math.cos(p.ang) * speed * dt;
+        p.y += Math.sin(p.ang) * speed * dt;
+        p.x = clamp(p.x, 0, world.w);
+        p.y = clamp(p.y, 0, world.h);
+
+        const head = p.segments[0];
+        head.x = p.x; head.y = p.y;
+        for (let i = 1; i < p.segments.length; i++) {
+            const prev = p.segments[i - 1];
+            const seg = p.segments[i];
+            const dx = seg.x - prev.x, dy = seg.y - prev.y;
+            const d = Math.sqrt(dx * dx + dy * dy) || 0.001;
+            if (d > 9.5) {
+                const t = (d - 9.5) / d;
+                seg.x -= dx * t;
+                seg.y -= dy * t;
+            }
+        }
+    });
+}
+
 setInterval(() => {
-    try {
-        updateBots(0.05);
-        io.emit('botUpdates', bots.map(b => ({
-            id: b.id, name: b.name, x: b.x, y: b.y, ang: b.ang, hue: b.hue,
-            score: b.score, segments: b.segments, targetLen: b.targetLen,
-            dead: b.dead, baseRadius: b.baseRadius
-        })));
-    } catch (e) { console.error(e); }
+    const dt = 0.05;
+    updateBots(dt);
+    updatePlayers(dt);
+    const playersArr = Array.from(gameState.players.values()).map(p => ({
+        id: p.id, name: p.name, x: p.x, y: p.y, ang: p.ang, hue: p.hue,
+        score: p.score, segments: p.segments, targetLen: p.targetLen,
+        dead: p.dead, baseRadius: p.baseRadius
+    }));
+    io.emit('playerUpdates', playersArr);
+    io.emit('botUpdates', bots.map(b => ({
+        id: b.id, name: b.name, x: b.x, y: b.y, ang: b.ang, hue: b.hue,
+        score: b.score, segments: b.segments, targetLen: b.targetLen,
+        dead: b.dead, baseRadius: b.baseRadius
+    })));
 }, 50);
 
 spawnFood();
@@ -238,61 +262,40 @@ io.on('connection', (socket) => {
     });
 
     socket.on('join', (data) => {
-        console.log(`Player ${data.name} (${socket.id}) is joining.`);
         const p = {
-            id: socket.id,
-            name: data.name || "Anonim",
-            x: rand(800, world.w - 800),
-            y: rand(800, world.h - 800),
-            hue: rand(0, 360),
-            score: 0,
-            targetLen: 10,
-            dead: false,
-            baseRadius: 12,
-            segments: []
+            id: socket.id, name: data.name || "Anonim",
+            x: rand(800, world.w - 800), y: rand(800, world.h - 800),
+            hue: rand(0, 360), score: 0, targetLen: 10, dead: false,
+            baseRadius: 12, segments: []
         };
         for (let k = 0; k < 10; k++) p.segments.push({ x: p.x, y: p.y, r: 10.8 });
         gameState.players.set(socket.id, p);
         io.emit('playerJoined', p);
     });
 
-    socket.on('update', (data) => {
+    socket.on('input', (data) => {
         const p = gameState.players.get(socket.id);
         if (p && !p.dead) {
-            Object.assign(p, data);
-            socket.broadcast.emit('playerUpdate', p);
+            if (data.ang !== undefined) p.targetAng = data.ang;
+            if (data.boost !== undefined) p.wantsBoost = data.boost;
         }
     });
 
     socket.on('requestFullState', () => {
         socket.emit('fullState', {
             players: Array.from(gameState.players.values()),
-            bots: bots,
-            foods: gameState.foods
+            bots: bots, foods: gameState.foods
         });
-    });
-
-    socket.on('heartbeat', () => {
-        // Just keep alive
     });
 
     socket.on('eat', (id) => {
         const i = gameState.foods.findIndex(f => f.id === id);
         if (i !== -1) {
-            const f = gameState.foods[i];
             gameState.foods.splice(i, 1);
-            removeFoodFromGrid(f);
+            removeFoodFromGrid(gameState.foods[i]);
             io.emit('foodEaten', { foodId: id, playerId: socket.id });
             spawnFood(1);
             io.emit('foodSpawned', gameState.foods[gameState.foods.length - 1]);
-        }
-    });
-
-    socket.on('kill', (data) => {
-        const p = gameState.players.get(socket.id);
-        if (p) {
-            p.dead = true;
-            io.emit('playerKilled', { victimId: socket.id, killerId: data?.killerId });
         }
     });
 

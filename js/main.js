@@ -144,30 +144,29 @@ state.socket.on('playerJoined', (p) => {
     }
 });
 
-state.socket.on('playerUpdate', (p) => {
-    if (p.id !== state.myId) {
-        // Sync local snakes array for rendering/collision
+state.socket.on('playerUpdates', (playerList) => {
+    playerList.forEach(p => {
         let s = state.snakes.find(s => s.id === p.id);
         if (!s) {
             s = p;
-            s.targetX = p.x;
-            s.targetY = p.y;
-            s.targetAng = p.ang;
+            s.targetX = p.x; s.targetY = p.y; s.targetAng = p.ang;
             s.targetSegments = p.segments;
             state.snakes.push(s);
+            if (p.id === state.myId) state.player = s;
         } else {
-            // Set targets for lerping
-            s.targetX = p.x;
-            s.targetY = p.y;
-            s.targetAng = p.ang;
+            s.targetX = p.x; s.targetY = p.y; s.targetAng = p.ang;
             s.targetSegments = p.segments;
             s.score = p.score;
             s.targetLen = p.targetLen;
-            s.name = p.name;
+            s.dead = p.dead;
             s.baseRadius = p.baseRadius || 12;
-            s.dead = p.dead; // CRITICAL: Update dead state to allow drawing after respawn
+            if (p.id === state.myId) {
+                // Local player specific: bridge properties if needed
+                state.player.x_server = p.x;
+                state.player.y_server = p.y;
+            }
         }
-    }
+    });
 });
 
 state.socket.on('playerLeft', (id) => {
@@ -298,84 +297,61 @@ function update(dt) {
         }
 
         // AI or Input
-        let wantsBoost = false;
         if (s.isPlayer) {
             let targetAng = s.ang;
             const keys = state.keys;
             const kx = (keys.d ? 1 : 0) - (keys.a ? 1 : 0);
             const ky = (keys.s ? 1 : 0) - (keys.w ? 1 : 0);
-
             const hasKey = (kx !== 0 || ky !== 0);
 
             if (state.controlMode === "keyboard" || (state.controlMode === "auto" && hasKey)) {
-                // Keyboard: used if explicitly set OR auto-detected when keys are pressed
                 if (hasKey) targetAng = Math.atan2(ky, kx);
-                else targetAng = s.ang; // hold direction if no keys
             } else {
-                // Mouse: default or explicitly set
                 const cx = innerWidth / 2;
                 const cy = innerHeight / 2;
                 targetAng = Math.atan2(state.mouse.y - cy, state.mouse.x - cx);
             }
 
-            let da = targetAng - s.ang;
+            const wantsBoost = state.boosting;
+            state.socket.emit('input', { ang: targetAng, boost: wantsBoost });
+        }
+
+        // All snakes (local, others, bots) use server-authoritative smoothing
+        if (s.targetX !== undefined) {
+            const k = 15 * dt;
+            s.x += (s.targetX - s.x) * k;
+            s.y += (s.targetY - s.y) * k;
+
+            // Smooth angle
+            let da = s.targetAng - s.ang;
             while (da > Math.PI) da -= Math.PI * 2;
             while (da < -Math.PI) da += Math.PI * 2;
-            s.ang += clamp(da, -s.turnAssist * dt, s.turnAssist * dt);
+            s.ang += da * k;
 
-            wantsBoost = state.boosting;
+            // Sync segments visually
+            if (s.targetSegments) {
+                // Sync length
+                while (s.segments.length < s.targetSegments.length) {
+                    const last = s.segments[s.segments.length - 1] || s;
+                    s.segments.push({ x: last.x, y: last.y, r: 0.1 });
+                }
+                while (s.segments.length > s.targetSegments.length) {
+                    s.segments.pop();
+                }
 
-            // local player does everything
-            moveSnake(s, dt, wantsBoost);
-            grow(s);
-            eatFood(s);
-            checkCollision(s);
+                for (let i = 0; i < s.segments.length; i++) {
+                    const ts = s.targetSegments[i];
+                    const seg = s.segments[i];
+                    if (!ts || !seg) continue;
+                    seg.x += (ts.x - seg.x) * k;
+                    seg.y += (ts.y - seg.y) * k;
 
-            // Send update to server
-            if (frameCounter % 2 === 0) {
-                state.socket.emit('update', {
-                    x: s.x, y: s.y, ang: s.ang, score: s.score,
-                    targetLen: s.targetLen, segments: s.segments,
-                    hue: s.hue, name: s.name
-                });
-            }
-        } else {
-            // Other players and Bots: Smoothing/Interpolation
-            if (s.targetX !== undefined) {
-                const k = 15 * dt; // Smoothing factor
-                s.x += (s.targetX - s.x) * k;
-                s.y += (s.targetY - s.y) * k;
-
-                // Smooth angle
-                let da = s.targetAng - s.ang;
-                while (da > Math.PI) da -= Math.PI * 2;
-                while (da < -Math.PI) da += Math.PI * 2;
-                s.ang += da * k;
-
-                // Sync segments visually
-                if (s.targetSegments) {
-                    // Sync length
-                    while (s.segments.length < s.targetSegments.length) {
-                        const last = s.segments[s.segments.length - 1] || s;
-                        s.segments.push({ x: last.x, y: last.y, r: 0.1 });
-                    }
-                    while (s.segments.length > s.targetSegments.length) {
-                        s.segments.pop();
-                    }
-
-                    for (let i = 0; i < s.segments.length; i++) {
-                        const ts = s.targetSegments[i];
-                        const seg = s.segments[i];
-                        if (!ts || !seg) continue;
-                        seg.x += (ts.x - seg.x) * k;
-                        seg.y += (ts.y - seg.y) * k;
-                        // Also lerp radius for growth animation
-                        if (ts.r !== undefined && !isNaN(ts.r)) {
-                            seg.r += (ts.r - seg.r) * k;
-                        } else {
-                            const targetR = s.baseRadius * 0.9;
-                            seg.r += (targetR - seg.r) * k;
-                        }
+                    // Lerp radius
+                    if (ts.r !== undefined && !isNaN(ts.r)) {
+                        seg.r += (ts.r - seg.r) * k;
+                    } else {
+                        const targetR = s.baseRadius * 0.9;
+                        seg.r += (targetR - seg.r) * k;
                     }
                 }
             }
