@@ -74,6 +74,17 @@ canvas {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    transition: all 0.2s;
+}
+
+.lb li.me {
+    color: #00ff88;
+    font-weight: 700;
+    text-shadow: 0 0 8px rgba(0, 255, 136, 0.4);
+    background: rgba(0, 255, 136, 0.08);
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: -6px;
 }
 
 .lb .you {

@@ -50,21 +50,27 @@ export const ui = {
 
     // Leaderboard Updates
     updateLeaderboard() {
-        // Sort snakes by score (length)
-        const sorted = [...state.snakes].sort((a, b) => b.targetLen - a.targetLen);
+        // Sort snakes by targetLen
+        // Use a default value of 0 if targetLen is missing
+        const sorted = [...state.snakes].sort((a, b) => (b.targetLen || 0) - (a.targetLen || 0));
         const top10 = sorted.slice(0, 10);
 
         let html = "";
         top10.forEach((s, i) => {
-            const cls = s.isPlayer ? 'class="me"' : '';
-            html += `<li ${cls}>${i + 1}. ${s.name} - ${Math.floor(s.targetLen)}</li>`;
+            // Check for isPlayer or if it corresponds to our local player
+            const isMe = s.isPlayer || (state.player && s.id === state.player.id);
+            const cls = isMe ? 'class="me"' : '';
+            const displayName = s.name || "Adsız Yılan";
+            const displayScore = Math.floor(s.targetLen || 10);
+
+            html += `<li ${cls}>${i + 1}. ${displayName} - ${displayScore}</li>`;
         });
         lbListEl.innerHTML = html;
 
         // Player rank
         if (state.player) {
-            const rank = sorted.indexOf(state.player) + 1;
-            lbYouEl.innerText = `Sıralaman: #${rank}`;
+            const rank = sorted.findIndex(s => s.id === state.player.id) + 1;
+            lbYouEl.innerHTML = `Sıralaman: <b style="color:#00ff88; font-size:1.1em;">#${rank || '?'}</b>`;
         }
     },
 
