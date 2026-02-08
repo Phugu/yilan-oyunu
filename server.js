@@ -200,11 +200,10 @@ function updateBots(dt) {
         const allSnakes = [...Array.from(gameState.players.values()), ...bots];
         for (const other of allSnakes) {
             if (other.dead) continue;
-            const isSelf = other.id === b.id;
+            if (other.id === b.id) continue; // Disable self-collision for bots as well
 
             const segs = other.segments || [];
             for (let i = 0; i < segs.length; i++) {
-                if (isSelf && i < 6) continue; // Skip own head
                 const seg = segs[i];
                 if (!seg) continue;
 
