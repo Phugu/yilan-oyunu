@@ -18,14 +18,29 @@
       <p>Bir isim seç ve maceraya başla!</p>
       <input type="text" id="playerNameInput" placeholder="İsmin nedir?" maxlength="12">
       <button id="startButton">OYNA</button>
+
+      <div class="control-selector">
+        <label>Kontrol:</label>
+        <div class="btn-group">
+          <button class="btn-ctrl active" data-mode="auto">Otomatik</button>
+          <button class="btn-ctrl" data-mode="mouse">Fare</button>
+          <button class="btn-ctrl" data-mode="keyboard">Klavye</button>
+        </div>
+      </div>
+
       <div class="hint">Shift: Hızlan | Fare: Yön</div>
     </div>
   </div>
 
   <div class="hud">
-    Skor: <b id="score">0</b> | En Yüksek: <b id="highScore">0</b> | Uzunluk: <b id="len">10</b> | Enerji: <b
-      id="energy">10.0s</b> | Bot: <b id="bots">0</b>
-    <div class="hint">Fare: yön | Shift: hızlanma (maliyetli) | R: yeniden doğ</div>
+    <div class="hud-top">
+      Skor: <b id="score">0</b> | En Yüksek: <b id="highScore">0</b> | Uzunluk: <b id="len">10</b> | Enerji: <b
+        id="energy">10.0s</b>
+      <button id="toggleControl" class="hud-btn"
+        style="margin-left: 15px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 4px 8px; border-radius: 4px; cursor: pointer;">🎮
+        Kontrol: Oto</button>
+    </div>
+    <div class="hint">Fare: yön | Shift: hızlanma | R: yeniden doğ</div>
   </div>
 
   <div id="killFeed" class="kill-feed"></div>

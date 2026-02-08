@@ -166,6 +166,54 @@ canvas {
     }
 }
 
+/* Control Selector */
+.control-selector {
+    margin: 20px 0;
+    text-align: left;
+}
+
+.control-selector label {
+    display: block;
+    font-size: 0.9em;
+    margin-bottom: 8px;
+    opacity: 0.8;
+}
+
+.btn-group {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-ctrl {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: all 0.2s;
+}
+
+.btn-ctrl:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.btn-ctrl.active {
+    background: linear-gradient(135deg, #00c6ff, #0072ff);
+    border-color: transparent;
+    box-shadow: 0 4px 15px rgba(0, 114, 255, 0.3);
+}
+
+.hud-top {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
 /* Menu Overlay */
 .menu-overlay {
     position: fixed;

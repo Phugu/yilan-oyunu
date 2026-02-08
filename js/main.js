@@ -1,4 +1,4 @@
-import { state, canvas, ctx, scoreEl, lenEl, botsEl, energyEl, lbListEl, lbYouEl, startButton, playerNameInput } from './store.js';
+import { state, canvas, ctx, scoreEl, lenEl, botsEl, energyEl, lbListEl, lbYouEl, startButton, playerNameInput, controlBtns, toggleControlBtn } from './store.js';
 import { ui } from './ui.js';
 import { world } from './constants.js';
 import { resize, drawWorldBoundary, drawGrid, drawFood, drawSegment, drawEyes, drawMiniMap } from './graphics.js';
@@ -49,6 +49,34 @@ startButton.addEventListener("click", () => {
 
 playerNameInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") startButton.click();
+});
+
+// Control Selection Logic
+controlBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+        controlBtns.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        state.controlMode = btn.dataset.mode;
+        updateControlHUDText();
+    });
+});
+
+function updateControlHUDText() {
+    if (!toggleControlBtn) return;
+    const modeMap = { auto: "Oto", mouse: "Fare", keyboard: "Klavye" };
+    toggleControlBtn.innerText = `🎮 Kontrol: ${modeMap[state.controlMode]}`;
+}
+
+toggleControlBtn.addEventListener("click", () => {
+    const modes = ["auto", "mouse", "keyboard"];
+    let nextIdx = (modes.indexOf(state.controlMode) + 1) % modes.length;
+    state.controlMode = modes[nextIdx];
+    updateControlHUDText();
+
+    // Also update menu buttons to stay in sync if visible
+    controlBtns.forEach(b => {
+        b.classList.toggle("active", b.dataset.mode === state.controlMode);
+    });
 });
 
 initPhysics(); // Move up to prevent wiping socket state later
@@ -188,12 +216,14 @@ function update(dt) {
             const kx = (keys.d ? 1 : 0) - (keys.a ? 1 : 0);
             const ky = (keys.s ? 1 : 0) - (keys.w ? 1 : 0);
 
-            if (kx !== 0 || ky !== 0) {
-                // Keyboard takes priority if any key is pressed
-                targetAng = Math.atan2(ky, kx);
-                state.lastInputMethod = "keyboard";
+            const hasKey = (kx !== 0 || ky !== 0);
+
+            if (state.controlMode === "keyboard" || (state.controlMode === "auto" && hasKey)) {
+                // Keyboard: used if explicitly set OR auto-detected when keys are pressed
+                if (hasKey) targetAng = Math.atan2(ky, kx);
+                else targetAng = s.ang; // hold direction if no keys
             } else {
-                // Mouse control
+                // Mouse: default or explicitly set
                 const cx = innerWidth / 2;
                 const cy = innerHeight / 2;
                 targetAng = Math.atan2(state.mouse.y - cy, state.mouse.x - cx);

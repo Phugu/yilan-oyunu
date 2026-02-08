@@ -16,6 +16,8 @@ export const killFeedEl = document.getElementById("killFeed");
 export const startOverlay = document.getElementById("startOverlay");
 export const playerNameInput = document.getElementById("playerNameInput");
 export const startButton = document.getElementById("startButton");
+export const controlBtns = document.querySelectorAll(".btn-ctrl");
+export const toggleControlBtn = document.getElementById("toggleControl");
 
 export const state = {
     cam: { x: world.w / 2, y: world.h / 2, shakeX: 0, shakeY: 0 },
@@ -32,5 +34,6 @@ export const state = {
     playerName: "Anonim",
     socket: null,
     otherPlayers: new Map(),
-    keys: { w: false, a: false, s: false, d: false, up: false, left: false, down: false, right: false }
+    keys: { w: false, a: false, s: false, d: false, up: false, left: false, down: false, right: false },
+    controlMode: "auto" // auto, mouse, keyboard
 };
