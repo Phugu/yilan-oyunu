@@ -2,7 +2,7 @@ import { state, canvas, ctx, scoreEl, lenEl, botsEl, energyEl, lbListEl, lbYouEl
 import { ui } from './ui.js';
 import { world } from './constants.js';
 import { resize, drawWorldBoundary, drawGrid, drawFood, drawSegment, drawEyes, drawMiniMap } from './graphics.js';
-import { spawnFood, spawnParticles, initPhysics, respawnPlayer, moveSnake, checkCollision, eatFood, grow, killSnake, respawnSnake, updateParticles, addFoodToGrid, removeFoodFromGrid } from './core.js';
+import { spawnFood, spawnParticles, initPhysics, moveSnake, checkCollision, eatFood, grow, killSnake, respawnSnake, updateParticles, addFoodToGrid, removeFoodFromGrid } from './core.js';
 import { botThink } from './ai.js';
 import { audio } from './audio.js';
 import { rand, clamp } from './utils.js';
@@ -15,7 +15,13 @@ window.addEventListener("mousemove", e => { state.mouse.x = e.clientX; state.mou
 
 window.addEventListener("keydown", (e) => {
     if (e.code === "ShiftLeft" || e.code === "ShiftRight") state.boosting = true;
-    if (e.code === "KeyR") { if (state.player && state.player.dead) respawnPlayer(); }
+    if (e.code === "KeyR") {
+        if (state.player && state.player.dead) {
+            // AUTHORITATIVE RESPAWN: Tell server to re-join us
+            state.socket.emit('join', { name: state.playerName });
+            ui.hideDeadScreen();
+        }
+    }
     if (!audio.unlocked) audio.unlock();
 
     // WASD / Arrows
@@ -72,12 +78,20 @@ toggleControlBtn.addEventListener("click", () => {
     let nextIdx = (modes.indexOf(state.controlMode) + 1) % modes.length;
     state.controlMode = modes[nextIdx];
     updateControlHUDText();
-
-    // Also update menu buttons to stay in sync if visible
     controlBtns.forEach(b => {
         b.classList.toggle("active", b.dataset.mode === state.controlMode);
     });
 });
+
+const deadOverlay = document.getElementById("deadOverlay");
+if (deadOverlay) {
+    deadOverlay.addEventListener("click", () => {
+        if (state.player && state.player.dead) {
+            state.socket.emit('join', { name: state.playerName });
+            ui.hideDeadScreen();
+        }
+    });
+}
 
 initPhysics(); // Move up to prevent wiping socket state later
 
@@ -128,25 +142,26 @@ state.socket.on('init', (data) => {
 });
 
 state.socket.on('playerJoined', (p) => {
+    let s = state.snakes.find(sn => sn.id === p.id);
+    if (!s) {
+        if (p.id === state.myId && state.player) {
+            s = state.player;
+        } else {
+            s = p;
+        }
+        if (!state.snakes.includes(s)) state.snakes.push(s);
+    }
+
+    // Sync all properties
+    Object.assign(s, p);
+    s.targetX = p.x;
+    s.targetY = p.y;
+    s.targetAng = p.ang;
+    s.targetSegments = p.segments;
+    s.dead = false;
+
     if (p.id !== state.myId) {
         state.otherPlayers.set(p.id, p);
-        let s = state.snakes.find(s => s.id === p.id);
-        if (!s) {
-            s = p;
-            s.targetX = p.x;
-            s.targetY = p.y;
-            s.targetAng = p.ang;
-            s.targetSegments = p.segments;
-            s.baseRadius = p.baseRadius || 12;
-            state.snakes.push(s);
-        } else {
-            // Update existing record
-            Object.assign(s, p);
-            s.targetX = p.x;
-            s.targetY = p.y;
-            s.targetAng = p.ang;
-            s.dead = false;
-        }
     }
 });
 

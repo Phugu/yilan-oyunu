@@ -165,10 +165,7 @@ export function respawnSnake(s) {
     s.vy = Math.sin(s.ang) * iv;
 }
 
-export function respawnPlayer() {
-    respawnSnake(state.player);
-    deadOverlay.style.display = "none";
-}
+
 
 function followSegments(s) {
     for (let i = 1; i < s.segments.length; i++) {
