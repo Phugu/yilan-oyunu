@@ -265,26 +265,10 @@ export function killSnake(s, killer = null) {
         ui.addKillMessage("Duvar", s.name);
     }
 
-    if (s.isPlayer) {
-        state.socket.emit('kill', { killerId: killer ? killer.id : null });
-    }
+
 
     for (let i = 0; i < s.segments.length; i++) {
         const seg = s.segments[i];
-        if (i % 2 === 0) {
-            const nf = {
-                x: clamp(seg.x + rand(-10, 10), 0, world.w),
-                y: clamp(seg.y + rand(-10, 10), 0, world.h),
-                r: rand(4.2, 7.8),
-                hue: s.hue + rand(-10, 10),
-                val: rand(1.2, 2.8),
-                ownerId: null,
-                lockT: 0,
-                isDrop: false
-            };
-            state.foods.push(nf);
-            addFoodToGrid(nf);
-        }
         if (i % 3 === 0) spawnParticles(seg.x, seg.y, 3, s.hue);
     }
     spawnParticles(s.x, s.y, 30, s.hue);

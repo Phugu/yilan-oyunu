@@ -51,7 +51,7 @@ export const ui = {
     updateLeaderboard() {
         // Sort snakes by targetLen
         // Use a default value of 0 if targetLen is missing
-        const sorted = [...state.snakes].sort((a, b) => (b.targetLen || 0) - (a.targetLen || 0));
+        const sorted = [...state.snakes].filter(s => !s.dead).sort((a, b) => (b.targetLen || 0) - (a.targetLen || 0));
         const top10 = sorted.slice(0, 10);
 
         let html = "";
