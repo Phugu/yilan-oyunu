@@ -116,7 +116,20 @@ state.socket.on('init', (data) => {
 });
 
 state.socket.on('playerJoined', (p) => {
-    if (p.id !== state.myId) state.otherPlayers.set(p.id, p);
+    if (p.id !== state.myId) {
+        state.otherPlayers.set(p.id, p);
+        // Also add to snakes array immediately so they aren't invisible
+        let s = state.snakes.find(s => s.id === p.id);
+        if (!s) {
+            s = p;
+            s.targetX = p.x;
+            s.targetY = p.y;
+            s.targetAng = p.ang;
+            s.targetSegments = p.segments;
+            s.baseRadius = p.baseRadius || 12;
+            state.snakes.push(s);
+        }
+    }
 });
 
 state.socket.on('playerUpdate', (p) => {

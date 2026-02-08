@@ -238,6 +238,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('join', (data) => {
+        console.log(`Player ${data.name} (${socket.id}) is joining.`);
         const p = {
             id: socket.id,
             name: data.name || "Anonim",
@@ -259,6 +260,7 @@ io.on('connection', (socket) => {
         const p = gameState.players.get(socket.id);
         if (p && !p.dead) {
             Object.assign(p, data);
+            // Throttle logs for updates if needed, but broadcast everything
             socket.broadcast.emit('playerUpdate', p);
         }
     });
