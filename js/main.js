@@ -95,30 +95,35 @@ state.socket.on('init', (data) => {
     data.players.forEach(p => {
         if (p.id !== state.myId) {
             state.otherPlayers.set(p.id, p);
-            // Also add to snakes array with targets initialized
-            p.targetX = p.x;
-            p.targetY = p.y;
-            p.targetAng = p.ang;
-            p.targetSegments = p.segments;
-            p.baseRadius = p.baseRadius || 12;
-            state.snakes.push(p);
+            // Check if already in snakes
+            let existing = state.snakes.find(s => s.id === p.id);
+            if (!existing) {
+                p.targetX = p.x;
+                p.targetY = p.y;
+                p.targetAng = p.ang;
+                p.targetSegments = p.segments;
+                p.baseRadius = p.baseRadius || 12;
+                state.snakes.push(p);
+            }
         }
     });
     // Add bots
     data.bots.forEach(b => {
-        b.targetX = b.x;
-        b.targetY = b.y;
-        b.targetAng = b.ang;
-        b.targetSegments = b.segments;
-        b.baseRadius = b.baseRadius || 12;
-        state.snakes.push(b);
+        let existing = state.snakes.find(s => s.id === b.id);
+        if (!existing) {
+            b.targetX = b.x;
+            b.targetY = b.y;
+            b.targetAng = b.ang;
+            b.targetSegments = b.segments;
+            b.baseRadius = b.baseRadius || 12;
+            state.snakes.push(b);
+        }
     });
 });
 
 state.socket.on('playerJoined', (p) => {
     if (p.id !== state.myId) {
         state.otherPlayers.set(p.id, p);
-        // Also add to snakes array immediately so they aren't invisible
         let s = state.snakes.find(s => s.id === p.id);
         if (!s) {
             s = p;
@@ -128,6 +133,13 @@ state.socket.on('playerJoined', (p) => {
             s.targetSegments = p.segments;
             s.baseRadius = p.baseRadius || 12;
             state.snakes.push(s);
+        } else {
+            // Update existing record
+            Object.assign(s, p);
+            s.targetX = p.x;
+            s.targetY = p.y;
+            s.targetAng = p.ang;
+            s.dead = false;
         }
     }
 });
@@ -383,20 +395,36 @@ function draw() {
 
 let lastTime = performance.now();
 let frameCounter = 0;
-function loop() {
-    requestAnimationFrame(loop);
+
+// Separate physics/logical loop from rendering to maintain sync in background tabs
+const tickRate = 60;
+const tickInterval = 1000 / tickRate;
+
+setInterval(() => {
     const now = performance.now();
     const dt = Math.min(0.06, (now - lastTime) / 1000);
     lastTime = now;
     frameCounter++;
 
     update(dt);
-    draw();
+
+    // HUD and LB occasional updates
     if (frameCounter % 15 === 0) {
         ui.updateHUD();
         ui.updateLeaderboard();
     }
+}, tickInterval);
+
+function loop() {
+    requestAnimationFrame(loop);
+    draw();
 }
 
-resize();
 loop();
+
+// Heartbeat to keep socket alive in background
+setInterval(() => {
+    if (document.visibilityState === 'hidden' && state.socket && state.gameStarted) {
+        state.socket.emit('heartbeat'); // Minimal keep-alive
+    }
+}, 1000);

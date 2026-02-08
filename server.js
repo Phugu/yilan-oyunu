@@ -260,9 +260,12 @@ io.on('connection', (socket) => {
         const p = gameState.players.get(socket.id);
         if (p && !p.dead) {
             Object.assign(p, data);
-            // Throttle logs for updates if needed, but broadcast everything
             socket.broadcast.emit('playerUpdate', p);
         }
+    });
+
+    socket.on('heartbeat', () => {
+        // Just keep alive
     });
 
     socket.on('eat', (id) => {
