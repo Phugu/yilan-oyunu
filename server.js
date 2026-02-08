@@ -1,13 +1,12 @@
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import { world, MAX_FOODS, FOOD_CELL, BOT_COUNT, BOT_NAMES, PERSONALITIES } from './js/constants.js';
-import { rand, clamp, dist2, hypot, norm, wrapAngle } from './js/utils.js';
+import { world, MAX_FOODS, FOOD_CELL, BOT_COUNT, BOT_NAMES } from './js/constants.js';
+import { rand, clamp, dist2, hypot, wrapAngle } from './js/utils.js';
 
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer);
-
 const PORT = process.env.PORT || 3000;
 
 app.use(express.static('.'));
@@ -29,10 +28,7 @@ function addFoodToGrid(f) {
 function removeFoodFromGrid(f) {
     if (!f || !f._cellKey) return;
     const list = gameState.foodGrid.get(f._cellKey);
-    if (list) {
-        const idx = list.indexOf(f);
-        if (idx !== -1) list.splice(idx, 1);
-    }
+    if (list) { const idx = list.indexOf(f); if (idx !== -1) list.splice(idx, 1); }
 }
 
 function spawnFood(n = MAX_FOODS) {
@@ -40,17 +36,11 @@ function spawnFood(n = MAX_FOODS) {
         const sizeT = Math.random();
         const f = {
             id: Math.random().toString(16).slice(2),
-            x: Math.random() * world.w,
-            y: Math.random() * world.h,
-            r: 4 + sizeT * 4,
-            hue: rand(0, 360),
-            val: (1 + sizeT * 1) * 0.40,
-            ownerId: null,
-            lockT: 0,
-            isDrop: false
+            x: Math.random() * world.w, y: Math.random() * world.h,
+            r: 4 + sizeT * 4, hue: rand(0, 360), val: (1 + sizeT * 1) * 0.40,
+            ownerId: null, lockT: 0, isDrop: false
         };
-        addFoodToGrid(f);
-        gameState.foods.push(f);
+        addFoodToGrid(f); gameState.foods.push(f);
     }
 }
 
@@ -59,10 +49,10 @@ function createBot(i) {
     const baseSpeed = rand(155, 180);
     const b = {
         id: "bot_" + Math.random().toString(36).slice(2),
-        name, isBot: true, x: rand(800, world.w - 800), y: rand(800, world.h - 800),
+        name, isBot: true, x: rand(1000, world.w - 1000), y: rand(1000, world.h - 1000),
         ang: rand(-Math.PI, Math.PI), hue: rand(0, 360), score: 0, targetLen: 6,
         segments: [], baseSpeed, boostSpeed: baseSpeed + 40, turnAssist: rand(5.5, 6.8),
-        segDist: 9.5, baseRadius: 10, dead: false, spawnGrace: 2.0, respawnTimer: 0,
+        segDist: 9.5, baseRadius: 10, dead: false, spawnGrace: 2.5, respawnTimer: 0,
         ai: { targetFoodId: null, retargetT: 0 }
     };
     for (let k = 0; k < 6; k++) b.segments.push({ x: b.x, y: b.y, r: b.baseRadius * 0.9 });
@@ -73,189 +63,174 @@ let bots = [];
 for (let i = 0; i < BOT_COUNT; i++) bots.push(createBot(i));
 
 function respawnBot(b) {
-    b.dead = false;
-    b.x = rand(800, world.w - 800);
-    b.y = rand(800, world.h - 800);
-    b.score = 0;
-    b.targetLen = 6;
-    b.spawnGrace = 2.0;
-    b.respawnTimer = 0;
-    b.segments = [];
-    for (let k = 0; k < 6; k++) b.segments.push({ x: b.x, y: b.y, r: b.baseRadius * 0.9 });
+    b.dead = false; b.x = rand(1000, world.w - 1000); b.y = rand(1000, world.h - 1000);
+    b.score = 0; b.targetLen = 6; b.spawnGrace = 2.5; b.respawnTimer = 0;
+    b.segments = []; for (let k = 0; k < 6; k++) b.segments.push({ x: b.x, y: b.y, r: b.baseRadius * 0.9 });
 }
 
-function updateBots(dt) {
-    bots.forEach(b => {
-        if (b.dead) {
-            b.respawnTimer -= dt;
-            if (b.respawnTimer <= 0) respawnBot(b);
+function moveEntity(e, dt) {
+    if (e.dead) return;
+    const speed = e.wantsBoost ? 350 : (e.baseSpeed || 190);
+    if (e.targetAng !== undefined) {
+        const da = wrapAngle(e.targetAng - e.ang);
+        const turnSpeed = e.turnAssist || 6.8;
+        e.ang += clamp(da, -turnSpeed * dt, turnSpeed * dt);
+    }
+    e.x += Math.cos(e.ang) * speed * dt;
+    e.y += Math.sin(e.ang) * speed * dt;
+    e.x = clamp(e.x, 0, world.w);
+    e.y = clamp(e.y, 0, world.h);
+
+    if (e.segments.length > 0) {
+        const head = e.segments[0]; head.x = e.x; head.y = e.y;
+        const dist = e.segDist || 9.5;
+        for (let i = 1; i < e.segments.length; i++) {
+            const prev = e.segments[i - 1], seg = e.segments[i];
+            const dx = seg.x - prev.x, dy = seg.y - prev.y;
+            const d = hypot(dx, dy) || 0.001;
+            if (d > dist) { const t = (d - dist) / d; seg.x -= dx * t; seg.y -= dy * t; }
+        }
+    }
+}
+
+function checkCollision(p, all) {
+    if (p.dead || p.spawnGrace > 0) return;
+
+    // Boundary
+    if (p.x <= 0 || p.x >= world.w || p.y <= 0 || p.y >= world.h) {
+        p.dead = true; p.respawnTimer = 3.0; io.emit('playerKilled', { victimId: p.id }); return;
+    }
+
+    // Others
+    for (const o of all) {
+        if (o.dead || o.id === p.id || o.spawnGrace > 0) continue;
+
+        // Head-to-Head
+        const headDist2 = dist2(p.x, p.y, o.x, o.y);
+        const minHeadDist = (p.baseRadius + o.baseRadius);
+        if (headDist2 < minHeadDist * minHeadDist) {
+            if (p.targetLen <= o.targetLen) {
+                p.dead = true; p.respawnTimer = 3.0;
+                io.emit('playerKilled', { victimId: p.id, killerId: o.id }); return;
+            }
+        }
+
+        // Head-to-Segments
+        for (let i = 1; i < o.segments.length; i++) {
+            const s = o.segments[i];
+            const rSum = (p.baseRadius * 0.90 + (s.r || 10) * 0.85);
+            if (dist2(p.x, p.y, s.x, s.y) < rSum * rSum) {
+                p.dead = true; p.respawnTimer = 3.0;
+                io.emit('playerKilled', { victimId: p.id, killerId: o.id }); return;
+            }
+        }
+    }
+
+    // Food
+    const rr2 = (p.baseRadius * 1.8) ** 2;
+    for (let i = gameState.foods.length - 1; i >= 0; i--) {
+        const f = gameState.foods[i];
+        if (dist2(p.x, p.y, f.x, f.y) < rr2) {
+            removeFoodFromGrid(f); gameState.foods.splice(i, 1);
+            io.emit('foodEaten', { foodId: f.id, playerId: p.id });
+            p.score += 5; p.targetLen += 0.25;
+            if (p.segments.length < Math.floor(p.targetLen)) {
+                const tail = p.segments[p.segments.length - 1];
+                p.segments.push({ x: tail.x, y: tail.y, r: p.baseRadius * 0.9 });
+            }
+            spawnFood(1); io.emit('foodSpawned', gameState.foods[gameState.foods.length - 1]);
+            break;
+        }
+    }
+}
+
+function updatePhysics() {
+    const dt = 0.033; // 30 FPS logic for better precision
+    const all = [...Array.from(gameState.players.values()), ...bots];
+
+    // 1. Move
+    all.forEach(e => {
+        if (e.dead) {
+            e.respawnTimer -= dt;
+            if (e.isBot && e.respawnTimer <= 0) respawnBot(e);
             return;
         }
-        if (b.spawnGrace > 0) b.spawnGrace -= dt;
+        if (e.spawnGrace > 0) e.spawnGrace -= dt;
 
-        const ai = b.ai; ai.retargetT -= dt;
-        if (ai.retargetT <= 0) {
-            ai.retargetT = rand(0.3, 1.2);
-            let bestFood = null, bestD2 = Infinity;
-            const scan = Math.min(gameState.foods.length, 25);
-            for (let k = 0; k < scan; k++) {
-                const f = gameState.foods[(Math.random() * gameState.foods.length) | 0];
-                if (f) { const d2 = dist2(b.x, b.y, f.x, f.y); if (d2 < bestD2) { bestD2 = d2; bestFood = f; } }
-            }
-            if (bestFood) ai.targetFoodId = bestFood.id;
-        }
-
-        let tx = b.x + Math.cos(b.ang) * 100, ty = b.y + Math.sin(b.ang) * 100;
-        const targetFood = gameState.foods.find(f => f.id === ai.targetFoodId);
-        if (targetFood) { tx = targetFood.x; ty = targetFood.y; }
-
-        const m = 500;
-        if (b.x < m) tx = b.x + 1000; else if (b.x > world.w - m) tx = b.x - 1000;
-        if (b.y < m) ty = b.y + 1000; else if (b.y > world.h - m) ty = b.y - 1000;
-
-        const da = wrapAngle(Math.atan2(ty - b.y, tx - b.x) - b.ang);
-        b.ang += clamp(da, -b.turnAssist * dt, b.turnAssist * dt);
-        b.x += Math.cos(b.ang) * b.baseSpeed * dt; b.y += Math.sin(b.ang) * b.baseSpeed * dt;
-        const head = b.segments[0]; head.x = b.x; head.y = b.y;
-        for (let i = 1; i < b.segments.length; i++) {
-            const prev = b.segments[i - 1], seg = b.segments[i];
-            const dx = seg.x - prev.x, dy = seg.y - prev.y, d = hypot(dx, dy) || 0.001;
-            if (d > b.segDist) { const t = (d - b.segDist) / d; seg.x -= dx * t; seg.y -= dy * t; }
-        }
-
-        const rr2 = (b.baseRadius * 1.6) ** 2;
-        for (let i = gameState.foods.length - 1; i >= 0; i--) {
-            const f = gameState.foods[i];
-            if (dist2(b.x, b.y, f.x, f.y) < rr2) {
-                removeFoodFromGrid(f); gameState.foods.splice(i, 1);
-                io.emit('foodEaten', { foodId: f.id, playerId: b.id });
-                b.score += 5; b.targetLen += 0.25;
-                if (b.segments.length < Math.floor(b.targetLen)) {
-                    const tail = b.segments[b.segments.length - 1];
-                    b.segments.push({ x: tail.x, y: tail.y, r: b.baseRadius * 0.9 });
+        if (e.isBot) {
+            // Bot AI
+            const ai = e.ai; ai.retargetT -= dt;
+            if (ai.retargetT <= 0) {
+                ai.retargetT = rand(0.3, 1.2);
+                let bestFood = null, bestD2 = Infinity;
+                for (let k = 0; k < 20; k++) {
+                    const f = gameState.foods[(Math.random() * gameState.foods.length) | 0];
+                    if (f) { const d2 = dist2(e.x, e.y, f.x, f.y); if (d2 < bestD2) { bestD2 = d2; bestFood = f; } }
                 }
-                spawnFood(1); io.emit('foodSpawned', gameState.foods[gameState.foods.length - 1]);
-                break;
+                if (bestFood) ai.targetFoodId = bestFood.id;
             }
+            let tx = e.x + Math.cos(e.ang) * 100, ty = e.y + Math.sin(e.ang) * 100;
+            const targetFood = gameState.foods.find(f => f.id === ai.targetFoodId);
+            if (targetFood) { tx = targetFood.x; ty = targetFood.y; }
+            const m = 600;
+            if (e.x < m) tx = e.x + 1000; else if (e.x > world.w - m) tx = e.x - 1000;
+            if (e.y < m) ty = e.y + 1000; else if (e.y > world.h - m) ty = e.y - 1000;
+            e.targetAng = Math.atan2(ty - e.y, tx - e.x);
         }
 
-        if (b.spawnGrace > 0) return;
-        if (b.x < 0 || b.x > world.w || b.y < 0 || b.y > world.h) {
-            b.dead = true; b.respawnTimer = 2.0;
-            io.emit('playerKilled', { victimId: b.id }); return;
-        }
-
-        const all = [...Array.from(gameState.players.values()), ...bots];
-        for (const o of all) {
-            if (o.dead || o.id === b.id) continue;
-            for (const s of (o.segments || [])) {
-                const rSum = (b.baseRadius * 0.75 + (s.r || 10) * 0.70);
-                if (dist2(b.x, b.y, s.x, s.y) < rSum * rSum) {
-                    b.dead = true; b.respawnTimer = 2.0;
-                    io.emit('playerKilled', { victimId: b.id, killerId: o.id }); return;
-                }
-            }
-        }
+        moveEntity(e, dt);
     });
+
+    // 2. Collisions (Authoritative)
+    all.forEach(e => checkCollision(e, all));
 }
 
-function updatePlayers(dt) {
-    gameState.players.forEach(p => {
-        if (p.dead) {
-            p.respawnTimer -= dt;
-            return;
-        }
-        if (p.spawnGrace > 0) p.spawnGrace -= dt;
-
-        const speed = p.wantsBoost ? 350 : 190;
-        if (p.targetAng !== undefined) { const da = wrapAngle(p.targetAng - p.ang); p.ang += clamp(da, -6.8 * dt, 6.8 * dt); }
-        p.x += Math.cos(p.ang) * speed * dt; p.y += Math.sin(p.ang) * speed * dt;
-        p.x = clamp(p.x, 0, world.w); p.y = clamp(p.y, 0, world.h);
-        const head = p.segments[0]; head.x = p.x; head.y = p.y;
-        for (let i = 1; i < p.segments.length; i++) {
-            const prev = p.segments[i - 1], seg = p.segments[i];
-            const dx = seg.x - prev.x, dy = seg.y - prev.y, d = hypot(dx, dy) || 0.001;
-            if (d > 9.5) { const t = (d - 9.5) / d; seg.x -= dx * t; seg.y -= dy * t; }
-        }
-
-        const rr2 = (p.baseRadius * 1.6) ** 2;
-        for (let i = gameState.foods.length - 1; i >= 0; i--) {
-            const f = gameState.foods[i];
-            if (dist2(p.x, p.y, f.x, f.y) < rr2) {
-                removeFoodFromGrid(f); gameState.foods.splice(i, 1);
-                io.emit('foodEaten', { foodId: f.id, playerId: p.id });
-                p.score += 5; p.targetLen += 0.25;
-                if (p.segments.length < Math.floor(p.targetLen)) {
-                    const tail = p.segments[p.segments.length - 1];
-                    p.segments.push({ x: tail.x, y: tail.y, r: p.baseRadius * 0.9 });
-                }
-                spawnFood(1); io.emit('foodSpawned', gameState.foods[gameState.foods.length - 1]);
-                break;
-            }
-        }
-
-        // Player collision logic
-        if (p.spawnGrace > 0) return;
-
-        if (p.x < 0 || p.x > world.w || p.y < 0 || p.y > world.h) {
-            p.dead = true; p.respawnTimer = 3.0;
-            io.emit('playerKilled', { victimId: p.id }); return;
-        }
-
-        const all = [...Array.from(gameState.players.values()), ...bots];
-        for (const o of all) {
-            if (o.dead || o.id === p.id) continue;
-            // Check head-to-head (very rare but possible)
-            if (dist2(p.x, p.y, o.x, o.y) < (p.baseRadius + o.baseRadius) ** 2) {
-                // Kill smaller or both
-                if (p.targetLen < o.targetLen) { p.dead = true; p.respawnTimer = 3.0; io.emit('playerKilled', { victimId: p.id, killerId: o.id }); }
-                else { o.dead = true; o.respawnTimer = 2.0; io.emit('playerKilled', { victimId: o.id, killerId: p.id }); }
-                return;
-            }
-            // Check head-to-segments
-            for (const s of (o.segments || [])) {
-                const rSum = (p.baseRadius * 0.75 + (s.r || 10) * 0.70);
-                if (dist2(p.x, p.y, s.x, s.y) < rSum * rSum) {
-                    p.dead = true; p.respawnTimer = 3.0;
-                    io.emit('playerKilled', { victimId: p.id, killerId: o.id }); return;
-                }
-            }
-        }
-    });
-}
+setInterval(updatePhysics, 33);
 
 setInterval(() => {
-    updateBots(0.05); updatePlayers(0.05);
     const playersArr = Array.from(gameState.players.values()).map(p => ({
         id: p.id, name: p.name, x: p.x, y: p.y, ang: p.ang, hue: p.hue, isPlayer: true,
-        score: p.score, segments: p.segments, targetLen: p.targetLen, dead: p.dead, baseRadius: p.baseRadius
+        score: p.score, segments: p.segments, targetLen: p.targetLen, dead: p.dead, baseRadius: p.baseRadius, spawnGrace: p.spawnGrace > 0
     }));
     io.emit('playerUpdates', playersArr);
     io.emit('botUpdates', bots.map(b => ({
-        id: b.id, name: b.name, x: b.x, y: b.y, ang: b.ang, hue: b.hue, score: b.score, segments: b.segments, targetLen: b.targetLen, dead: b.dead, baseRadius: b.baseRadius
+        id: b.id, name: b.name, x: b.x, y: b.y, ang: b.ang, hue: b.hue, score: b.score, segments: b.segments, targetLen: b.targetLen, dead: b.dead, baseRadius: b.baseRadius, spawnGrace: b.spawnGrace > 0
     })));
-}, 50);
+}, 45); // Broadcast a bit slower than physics for bandwidth
 
 spawnFood();
 
 io.on('connection', (socket) => {
+    console.log(`Socket connected: ${socket.id}`);
     socket.emit('init', { id: socket.id, foods: gameState.foods, players: Array.from(gameState.players.values()), bots: bots });
+
     socket.on('join', (data) => {
+        // Reset player on join if they were dead
         const p = {
-            id: socket.id, name: data.name || "Anonim", x: rand(800, world.w - 800), y: rand(800, world.h - 800),
-            ang: 0, targetAng: 0, hue: rand(0, 360), score: 0, targetLen: 6, dead: false, baseRadius: 10, segments: [], isPlayer: true, spawnGrace: 2.0, respawnTimer: 0
+            id: socket.id, name: data.name || "Anonim", x: rand(1000, world.w - 1000), y: rand(1000, world.h - 1000),
+            ang: rand(-Math.PI, Math.PI), targetAng: 0, hue: rand(0, 360), score: 0, targetLen: 6, dead: false, baseRadius: 10, segments: [], isPlayer: true, spawnGrace: 2.5, respawnTimer: 0
         };
         for (let k = 0; k < 6; k++) p.segments.push({ x: p.x, y: p.y, r: p.baseRadius * 0.9 });
-        gameState.players.set(socket.id, p); io.emit('playerJoined', p);
+        gameState.players.set(socket.id, p);
+        io.emit('playerJoined', p);
     });
+
     socket.on('input', (data) => {
         const p = gameState.players.get(socket.id);
-        if (p && !p.dead) { if (data.ang !== undefined) p.targetAng = data.ang; if (data.boost !== undefined) p.wantsBoost = data.boost; }
+        if (p && !p.dead) {
+            if (data.ang !== undefined) p.targetAng = data.ang;
+            if (data.boost !== undefined) p.wantsBoost = data.boost;
+        }
     });
+
     socket.on('requestFullState', () => {
         socket.emit('fullState', { players: Array.from(gameState.players.values()), bots, foods: gameState.foods });
     });
-    socket.on('disconnect', () => { gameState.players.delete(socket.id); io.emit('playerLeft', socket.id); });
+
+    socket.on('disconnect', () => {
+        console.log(`Socket disconnected: ${socket.id}`);
+        gameState.players.delete(socket.id); io.emit('playerLeft', socket.id);
+    });
 });
 
-httpServer.listen(PORT, () => console.log(`Server on ${PORT}`));
+httpServer.listen(PORT, () => console.log(`Server started on port ${PORT} at ${new Date().toISOString()}`));

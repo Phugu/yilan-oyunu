@@ -25,10 +25,13 @@ export function resize() {
     bgGradientCache = null;
 }
 
-export function drawSegment(wx, wy, r, hue, t) {
+export function drawSegment(wx, wy, r, hue, t, isGhost = false) {
     if (!Number.isFinite(wx) || !Number.isFinite(wy) || !Number.isFinite(r) || r < 0.1) return;
     const p = toScreen(wx, wy);
     if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+
+    const prevAlpha = ctx.globalAlpha;
+    if (isGhost) ctx.globalAlpha = 0.45;
 
     ctx.beginPath();
     ctx.fillStyle = "rgba(0,0,0,0.28)";
@@ -50,7 +53,6 @@ export function drawSegment(wx, wy, r, hue, t) {
         ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
         ctx.fill();
     } catch (e) {
-        // Fallback if gradient fails
         ctx.beginPath();
         ctx.fillStyle = `hsla(${hue}, 88%, 60%, 0.98)`;
         ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
@@ -61,10 +63,8 @@ export function drawSegment(wx, wy, r, hue, t) {
     ctx.lineWidth = Math.max(1, r * 0.12);
     ctx.arc(p.x, p.y, r * 0.98, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.beginPath();
-    ctx.fillStyle = "rgba(255,255,255,0.22)";
-    ctx.arc(p.x - r * 0.35, p.y - r * 0.35, r * 0.35, 0, Math.PI * 2);
-    ctx.fill();
+
+    ctx.globalAlpha = prevAlpha;
 }
 
 export function drawEyes(s) {

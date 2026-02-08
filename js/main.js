@@ -414,8 +414,7 @@ function draw() {
         const t = (s.isPlayer && s._wantsBoost) ? 1.0 : 0.0; // rudimentary visual feedback
         for (let i = s.segments.length - 1; i >= 0; i--) {
             const seg = s.segments[i];
-            // draw
-            drawSegment(seg.x, seg.y, seg.r, s.hue, i == 0 ? 0 : 0); // simplify
+            drawSegment(seg.x, seg.y, seg.r, s.hue, i == 0 ? 0 : 0, s.spawnGrace);
         }
         drawEyes(s);
 
