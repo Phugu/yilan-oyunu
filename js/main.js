@@ -86,6 +86,8 @@ state.socket = io();
 
 state.socket.on('init', (data) => {
     state.myId = data.id;
+    if (state.player) state.player.id = state.myId; // Sync ID
+
     // Server handles initial food now
     state.foods = data.foods;
     state.foodGrid.clear();
@@ -95,16 +97,20 @@ state.socket.on('init', (data) => {
     data.players.forEach(p => {
         if (p.id !== state.myId) {
             state.otherPlayers.set(p.id, p);
-            // Check if already in snakes
             let existing = state.snakes.find(s => s.id === p.id);
             if (!existing) {
-                p.targetX = p.x;
-                p.targetY = p.y;
-                p.targetAng = p.ang;
+                p.targetX = p.x; p.targetY = p.y; p.targetAng = p.ang;
                 p.targetSegments = p.segments;
                 p.baseRadius = p.baseRadius || 12;
                 state.snakes.push(p);
             }
+        } else {
+            // This is me, initialize my position
+            state.player.x = p.x;
+            state.player.y = p.y;
+            state.player.targetX = p.x;
+            state.player.targetY = p.y;
+            if (!state.snakes.includes(state.player)) state.snakes.push(state.player);
         }
     });
     // Add bots
@@ -146,13 +152,18 @@ state.socket.on('playerJoined', (p) => {
 
 state.socket.on('playerUpdates', (playerList) => {
     playerList.forEach(p => {
-        let s = state.snakes.find(s => s.id === p.id);
+        let s = state.snakes.find(sn => sn.id === p.id);
         if (!s) {
-            s = p;
+            // If it's the local player but wasn't in snakes yet
+            if (p.id === state.myId && state.player) {
+                s = state.player;
+                if (!state.snakes.includes(s)) state.snakes.push(s);
+            } else {
+                s = p;
+                state.snakes.push(s);
+            }
             s.targetX = p.x; s.targetY = p.y; s.targetAng = p.ang;
             s.targetSegments = p.segments;
-            state.snakes.push(s);
-            if (p.id === state.myId) state.player = s;
         } else {
             s.targetX = p.x; s.targetY = p.y; s.targetAng = p.ang;
             s.targetSegments = p.segments;
@@ -160,11 +171,6 @@ state.socket.on('playerUpdates', (playerList) => {
             s.targetLen = p.targetLen;
             s.dead = p.dead;
             s.baseRadius = p.baseRadius || 12;
-            if (p.id === state.myId) {
-                // Local player specific: bridge properties if needed
-                state.player.x_server = p.x;
-                state.player.y_server = p.y;
-            }
         }
     });
 });
