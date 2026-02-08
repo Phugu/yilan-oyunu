@@ -17,10 +17,21 @@ window.addEventListener("keydown", (e) => {
     if (e.code === "ShiftLeft" || e.code === "ShiftRight") state.boosting = true;
     if (e.code === "KeyR") { if (state.player && state.player.dead) respawnPlayer(); }
     if (!audio.unlocked) audio.unlock();
+
+    // WASD / Arrows
+    if (e.code === "KeyW" || e.code === "ArrowUp") state.keys.w = true;
+    if (e.code === "KeyA" || e.code === "ArrowLeft") state.keys.a = true;
+    if (e.code === "KeyS" || e.code === "ArrowDown") state.keys.s = true;
+    if (e.code === "KeyD" || e.code === "ArrowRight") state.keys.d = true;
 }, { passive: true });
 
 window.addEventListener("keyup", (e) => {
     if (e.code === "ShiftLeft" || e.code === "ShiftRight") state.boosting = false;
+
+    if (e.code === "KeyW" || e.code === "ArrowUp") state.keys.w = false;
+    if (e.code === "KeyA" || e.code === "ArrowLeft") state.keys.a = false;
+    if (e.code === "KeyS" || e.code === "ArrowDown") state.keys.s = false;
+    if (e.code === "KeyD" || e.code === "ArrowRight") state.keys.d = false;
 }, { passive: true });
 
 // Start Button logic
@@ -54,6 +65,10 @@ state.socket.on('init', (data) => {
     data.players.forEach(p => {
         if (p.id !== state.myId) state.otherPlayers.set(p.id, p);
     });
+    // Add bots
+    data.bots.forEach(b => {
+        state.snakes.push(b);
+    });
 });
 
 state.socket.on('playerJoined', (p) => {
@@ -62,13 +77,20 @@ state.socket.on('playerJoined', (p) => {
 
 state.socket.on('playerUpdate', (p) => {
     if (p.id !== state.myId) {
-        state.otherPlayers.set(p.id, p);
         // Sync local snakes array for rendering/collision
-        const idx = state.snakes.findIndex(s => s.id === p.id);
-        if (idx === -1) {
-            state.snakes.push(p);
+        let s = state.snakes.find(s => s.id === p.id);
+        if (!s) {
+            s = p;
+            state.snakes.push(s);
         } else {
-            state.snakes[idx] = p;
+            // Set targets for lerping
+            s.targetX = p.x;
+            s.targetY = p.y;
+            s.targetAng = p.ang;
+            s.targetSegments = p.segments;
+            s.score = p.score;
+            s.targetLen = p.targetLen;
+            s.name = p.name;
         }
     }
 });
@@ -101,6 +123,24 @@ state.socket.on('playerKilled', (data) => {
     }
 });
 
+state.socket.on('botUpdates', (botList) => {
+    botList.forEach(b => {
+        let s = state.snakes.find(s => s.id === b.id);
+        if (!s) {
+            s = b;
+            state.snakes.push(s);
+        } else {
+            // Set targets for lerping/smoothing
+            s.targetX = b.x;
+            s.targetY = b.y;
+            s.targetAng = b.ang;
+            s.targetSegments = b.segments;
+            s.score = b.score;
+            s.targetLen = b.targetLen;
+        }
+    });
+});
+
 function update(dt) {
     if (!state.gameStarted) return;
     // Update foods lock
@@ -121,9 +161,22 @@ function update(dt) {
         // AI or Input
         let wantsBoost = false;
         if (s.isPlayer) {
-            const cx = innerWidth / 2;
-            const cy = innerHeight / 2;
-            const targetAng = Math.atan2(state.mouse.y - cy, state.mouse.x - cx);
+            let targetAng = s.ang;
+            const keys = state.keys;
+            const kx = (keys.d ? 1 : 0) - (keys.a ? 1 : 0);
+            const ky = (keys.s ? 1 : 0) - (keys.w ? 1 : 0);
+
+            if (kx !== 0 || ky !== 0) {
+                // Keyboard takes priority if any key is pressed
+                targetAng = Math.atan2(ky, kx);
+                state.lastInputMethod = "keyboard";
+            } else {
+                // Mouse control
+                const cx = innerWidth / 2;
+                const cy = innerHeight / 2;
+                targetAng = Math.atan2(state.mouse.y - cy, state.mouse.x - cx);
+            }
+
             let da = targetAng - s.ang;
             while (da > Math.PI) da -= Math.PI * 2;
             while (da < -Math.PI) da += Math.PI * 2;
@@ -145,19 +198,27 @@ function update(dt) {
                     hue: s.hue, name: s.name
                 });
             }
-        } else if (s.ai) {
-            // Bots
-            botThink(s, dt);
-            wantsBoost = s._wantsBoost;
-            moveSnake(s, dt, wantsBoost);
-            grow(s);
-            eatFood(s);
-            checkCollision(s);
         } else {
-            // Other real players
-            // Position and segments are updated by socket 'playerUpdate'
-            // We might want to interpolation/lerp here for smoothness, 
-            // but for now let's just keep it simple.
+            // Other players and Bots: Smoothing/Interpolation
+            if (s.targetX !== undefined) {
+                const k = 15 * dt; // Smoothing factor
+                s.x += (s.targetX - s.x) * k;
+                s.y += (s.targetY - s.y) * k;
+
+                // Smooth angle
+                let da = s.targetAng - s.ang;
+                while (da > Math.PI) da -= Math.PI * 2;
+                while (da < -Math.PI) da += Math.PI * 2;
+                s.ang += da * k;
+
+                // Sync segments visually
+                if (s.targetSegments) {
+                    for (let i = 0; i < s.segments.length && i < s.targetSegments.length; i++) {
+                        s.segments[i].x += (s.targetSegments[i].x - s.segments[i].x) * k;
+                        s.segments[i].y += (s.targetSegments[i].y - s.segments[i].y) * k;
+                    }
+                }
+            }
         }
     }
 

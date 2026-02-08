@@ -31,5 +31,6 @@ export const state = {
     gameStarted: false,
     playerName: "Anonim",
     socket: null,
-    otherPlayers: new Map()
+    otherPlayers: new Map(),
+    keys: { w: false, a: false, s: false, d: false, up: false, left: false, down: false, right: false }
 };
