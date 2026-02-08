@@ -153,6 +153,7 @@ state.socket.on('playerUpdate', (p) => {
             s.targetLen = p.targetLen;
             s.name = p.name;
             s.baseRadius = p.baseRadius || 12;
+            s.dead = p.dead; // CRITICAL: Update dead state to allow drawing after respawn
         }
     }
 });
