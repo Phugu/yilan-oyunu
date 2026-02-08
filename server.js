@@ -27,6 +27,7 @@ function addFoodToGrid(f) {
 }
 
 function removeFoodFromGrid(f) {
+    if (!f._cellKey) return;
     const list = gameState.foodGrid.get(f._cellKey);
     if (list) {
         const idx = list.indexOf(f);
@@ -76,10 +77,7 @@ function createBot(i) {
         baseRadius: 12,
         dead: false,
         spawnGrace: 2.0,
-        ai: {
-            targetFoodId: null,
-            retargetT: 0
-        }
+        ai: { targetFoodId: null, retargetT: 0 }
     };
     for (let k = 0; k < Math.floor(b.targetLen); k++) {
         b.segments.push({ x: b.x, y: b.y, r: b.baseRadius * 0.9 });
@@ -88,9 +86,7 @@ function createBot(i) {
 }
 
 let bots = [];
-for (let i = 0; i < BOT_COUNT; i++) {
-    bots.push(createBot(i));
-}
+for (let i = 0; i < BOT_COUNT; i++) bots.push(createBot(i));
 
 function respawnBot(b) {
     b.dead = false;
@@ -171,8 +167,7 @@ function updateBots(dt) {
                 b.score += 5;
                 b.targetLen += 0.25;
                 if (b.segments.length < Math.floor(b.targetLen)) {
-                    const last = b.segments[b.segments.length - 1];
-                    b.segments.push({ x: last.x, y: last.y, r: b.baseRadius * 0.9 });
+                    b.segments.push({ x: b.segments[b.segments.length - 1].x, y: b.segments[b.segments.length - 1].y, r: b.baseRadius * 0.9 });
                 }
                 spawnFood(1);
                 io.emit('foodSpawned', gameState.foods[gameState.foods.length - 1]);
@@ -190,9 +185,7 @@ function updateBots(dt) {
         const all = [...Array.from(gameState.players.values()), ...bots];
         for (const o of all) {
             if (o.dead || o.id === b.id) continue;
-            const segs = o.segments || [];
-            for (let i = 0; i < segs.length; i++) {
-                const s = segs[i];
+            for (const s of (o.segments || [])) {
                 if (!s) continue;
                 const rSum = (b.baseRadius * 0.75 + (s.r || 10) * 0.75);
                 if (dist2(b.x, b.y, s.x, s.y) < rSum * rSum) {
@@ -231,6 +224,26 @@ function updatePlayers(dt) {
                 seg.y -= dy * t;
             }
         }
+
+        // Eat Food
+        const rr = p.baseRadius * 1.6;
+        const rr2 = rr * rr;
+        for (let i = gameState.foods.length - 1; i >= 0; i--) {
+            const f = gameState.foods[i];
+            if (dist2(p.x, p.y, f.x, f.y) < rr2) {
+                gameState.foods.splice(i, 1);
+                removeFoodFromGrid(f);
+                io.emit('foodEaten', { foodId: f.id, playerId: p.id });
+                p.score += 5;
+                p.targetLen += 0.25;
+                if (p.segments.length < Math.floor(p.targetLen)) {
+                    p.segments.push({ x: p.segments[p.segments.length - 1].x, y: p.segments[p.segments.length - 1].y, r: p.baseRadius * 0.9 });
+                }
+                spawnFood(1);
+                io.emit('foodSpawned', gameState.foods[gameState.foods.length - 1]);
+                break;
+            }
+        }
     });
 }
 
@@ -239,7 +252,7 @@ setInterval(() => {
     updateBots(dt);
     updatePlayers(dt);
     const playersArr = Array.from(gameState.players.values()).map(p => ({
-        id: p.id, name: p.name, x: p.x, y: p.y, ang: p.ang, hue: p.hue,
+        id: p.id, name: p.name, x: p.x, y: p.y, ang: p.ang, hue: p.hue, isPlayer: true,
         score: p.score, segments: p.segments, targetLen: p.targetLen,
         dead: p.dead, baseRadius: p.baseRadius
     }));
@@ -264,9 +277,9 @@ io.on('connection', (socket) => {
     socket.on('join', (data) => {
         const p = {
             id: socket.id, name: data.name || "Anonim",
-            x: rand(800, world.w - 800), y: rand(800, world.h - 800),
+            x: rand(800, world.w - 800), y: rand(800, world.h - 800), ang: 0, targetAng: 0,
             hue: rand(0, 360), score: 0, targetLen: 10, dead: false,
-            baseRadius: 12, segments: []
+            baseRadius: 12, segments: [], isPlayer: true
         };
         for (let k = 0; k < 10; k++) p.segments.push({ x: p.x, y: p.y, r: 10.8 });
         gameState.players.set(socket.id, p);
@@ -286,17 +299,6 @@ io.on('connection', (socket) => {
             players: Array.from(gameState.players.values()),
             bots: bots, foods: gameState.foods
         });
-    });
-
-    socket.on('eat', (id) => {
-        const i = gameState.foods.findIndex(f => f.id === id);
-        if (i !== -1) {
-            gameState.foods.splice(i, 1);
-            removeFoodFromGrid(gameState.foods[i]);
-            io.emit('foodEaten', { foodId: id, playerId: socket.id });
-            spawnFood(1);
-            io.emit('foodSpawned', gameState.foods[gameState.foods.length - 1]);
-        }
     });
 
     socket.on('disconnect', () => {
