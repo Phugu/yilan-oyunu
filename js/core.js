@@ -310,7 +310,7 @@ export function checkCollision(s) {
     }
     for (let i = 10; i < s.segments.length; i++) {
         const seg = s.segments[i];
-        const rr = (s.baseRadius * 0.75 + seg.r * 0.65);
+        const rr = (s.baseRadius * 0.70 + seg.r * 0.60);
         if (dist2(head.x, head.y, seg.x, seg.y) < rr * rr) {
             killSnake(s); return;
         }
@@ -318,7 +318,7 @@ export function checkCollision(s) {
     for (const o of state.snakes) {
         if (o === s || o.dead) continue;
         const oh = o.segments[0];
-        const hh = (s.baseRadius * 0.92 + o.baseRadius * 0.92);
+        const hh = (s.baseRadius * 0.88 + o.baseRadius * 0.88);
         if (dist2(head.x, head.y, oh.x, oh.y) < hh * hh) {
             if (s.segments.length > o.segments.length) killSnake(o, s);
             else if (s.segments.length < o.segments.length) killSnake(s, o);
@@ -327,7 +327,7 @@ export function checkCollision(s) {
         }
         for (let i = 4; i < o.segments.length; i++) {
             const seg = o.segments[i];
-            const rr = (s.baseRadius * 0.78 + seg.r * 0.70);
+            const rr = (s.baseRadius * 0.72 + seg.r * 0.65);
             if (dist2(head.x, head.y, seg.x, seg.y) < rr * rr) {
                 killSnake(s, o); return;
             }

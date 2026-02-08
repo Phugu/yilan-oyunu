@@ -265,9 +265,26 @@ function update(dt) {
 
                 // Sync segments visually
                 if (s.targetSegments) {
-                    for (let i = 0; i < s.segments.length && i < s.targetSegments.length; i++) {
-                        s.segments[i].x += (s.targetSegments[i].x - s.segments[i].x) * k;
-                        s.segments[i].y += (s.targetSegments[i].y - s.segments[i].y) * k;
+                    // Sync length
+                    while (s.segments.length < s.targetSegments.length) {
+                        const last = s.segments[s.segments.length - 1] || s;
+                        s.segments.push({ x: last.x, y: last.y, r: 0.1 });
+                    }
+                    while (s.segments.length > s.targetSegments.length) {
+                        s.segments.pop();
+                    }
+
+                    for (let i = 0; i < s.segments.length; i++) {
+                        const ts = s.targetSegments[i];
+                        const seg = s.segments[i];
+                        seg.x += (ts.x - seg.x) * k;
+                        seg.y += (ts.y - seg.y) * k;
+                        // Also lerp radius for growth animation
+                        if (ts.r !== undefined) {
+                            seg.r += (ts.r - seg.r) * k;
+                        } else {
+                            seg.r = s.baseRadius * 0.9; // Fallback
+                        }
                     }
                 }
             }
