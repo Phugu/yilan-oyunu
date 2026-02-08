@@ -26,24 +26,36 @@ export function resize() {
 }
 
 export function drawSegment(wx, wy, r, hue, t) {
+    if (!Number.isFinite(wx) || !Number.isFinite(wy) || !Number.isFinite(r) || r < 0.1) return;
     const p = toScreen(wx, wy);
+    if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+
     ctx.beginPath();
     ctx.fillStyle = "rgba(0,0,0,0.28)";
     ctx.arc(p.x + r * 0.22, p.y + r * 0.28, r * 1.02, 0, Math.PI * 2);
     ctx.fill();
-    const grad = ctx.createRadialGradient(
-        p.x - r * 0.35, p.y - r * 0.35, r * 0.2,
-        p.x, p.y, r * 1.15
-    );
-    const sat = 88;
-    const light = 68 - t * 12;
-    grad.addColorStop(0, `hsla(${hue}, ${sat}%, ${light + 22}%, 0.98)`);
-    grad.addColorStop(0.55, `hsla(${hue}, ${sat}%, ${light}%, 0.98)`);
-    grad.addColorStop(1, `hsla(${hue}, ${sat}%, ${light - 14}%, 0.98)`);
-    ctx.beginPath();
-    ctx.fillStyle = grad;
-    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-    ctx.fill();
+
+    try {
+        const grad = ctx.createRadialGradient(
+            p.x - r * 0.35, p.y - r * 0.35, r * 0.2,
+            p.x, p.y, r * 1.15
+        );
+        const sat = 88;
+        const light = 68 - t * 12;
+        grad.addColorStop(0, `hsla(${hue}, ${sat}%, ${light + 22}%, 0.98)`);
+        grad.addColorStop(0.55, `hsla(${hue}, ${sat}%, ${light}%, 0.98)`);
+        grad.addColorStop(1, `hsla(${hue}, ${sat}%, ${light - 14}%, 0.98)`);
+        ctx.beginPath();
+        ctx.fillStyle = grad;
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        ctx.fill();
+    } catch (e) {
+        // Fallback if gradient fails
+        ctx.beginPath();
+        ctx.fillStyle = `hsla(${hue}, 88%, 60%, 0.98)`;
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        ctx.fill();
+    }
     ctx.beginPath();
     ctx.strokeStyle = `hsla(${hue}, 92%, ${78 - t * 10}%, 0.38)`;
     ctx.lineWidth = Math.max(1, r * 0.12);

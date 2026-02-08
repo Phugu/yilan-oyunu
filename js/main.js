@@ -295,13 +295,15 @@ function update(dt) {
                     for (let i = 0; i < s.segments.length; i++) {
                         const ts = s.targetSegments[i];
                         const seg = s.segments[i];
+                        if (!ts || !seg) continue;
                         seg.x += (ts.x - seg.x) * k;
                         seg.y += (ts.y - seg.y) * k;
                         // Also lerp radius for growth animation
-                        if (ts.r !== undefined) {
+                        if (ts.r !== undefined && !isNaN(ts.r)) {
                             seg.r += (ts.r - seg.r) * k;
                         } else {
-                            seg.r = s.baseRadius * 0.9; // Fallback
+                            const targetR = s.baseRadius * 0.9;
+                            seg.r += (targetR - seg.r) * k;
                         }
                     }
                 }

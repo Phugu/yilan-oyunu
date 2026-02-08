@@ -183,9 +183,11 @@ function followSegments(s) {
             seg.y -= dy * t;
         }
         // Animate segment radius
-        if (seg.r < s.baseRadius * 0.9) {
-            seg.r += (s.baseRadius * 0.9 - seg.r) * 3 * 0.016; // Approx dt
-            if (seg.r > s.baseRadius * 0.9) seg.r = s.baseRadius * 0.9;
+        let targetR = s.baseRadius * 0.9;
+        if (!Number.isFinite(targetR)) targetR = 10.8;
+        if (seg.r < targetR) {
+            seg.r += (targetR - seg.r) * 3 * 0.016; // Approx dt
+            if (seg.r > targetR) seg.r = targetR;
         }
     }
 }
