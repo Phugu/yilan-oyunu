@@ -53,38 +53,36 @@ function spawnFood(n = MAX_FOODS) {
     }
 }
 
-// Bot management
 function createBot(i) {
-    const name = BOT_NAMES[i % BOT_NAMES.length] + " " + (i + 1);
-    const persona = PERSONALITIES[(Math.random() * PERSONALITIES.length) | 0].key;
+    const name = BOT_NAMES[i % BOT_NAMES.length];
     const baseSpeed = rand(155, 180);
     const id = "bot_" + Math.random().toString(36).slice(2);
     const b = {
         id,
         name,
         isBot: true,
-        x: rand(500, world.w - 500),
-        y: rand(500, world.h - 500),
+        x: rand(800, world.w - 800),
+        y: rand(800, world.h - 800),
         vx: 0, vy: 0,
         ang: rand(-Math.PI, Math.PI),
         hue: rand(0, 360),
         score: 0,
-        targetLen: rand(9, 16),
+        targetLen: rand(9, 15),
         segments: [],
         baseSpeed,
         boostSpeed: baseSpeed + 40,
-        turnAssist: rand(6.0, 7.2),
+        turnAssist: rand(5.5, 6.8),
         segDist: 9.5,
         baseRadius: 12,
         dead: false,
+        spawnGrace: 2.0, // 2 seconds invincibility
         ai: {
             targetFoodId: null,
-            retargetT: 0,
-            boostT: 0
+            retargetT: 0
         }
     };
     for (let k = 0; k < Math.floor(b.targetLen); k++) {
-        b.segments.push({ x: b.x - k * b.segDist, y: b.y, r: b.baseRadius * 0.9 });
+        b.segments.push({ x: b.x, y: b.y, r: b.baseRadius * 0.9 });
     }
     return b;
 }
@@ -96,10 +94,11 @@ for (let i = 0; i < BOT_COUNT; i++) {
 
 function respawnBot(b) {
     b.dead = false;
-    b.x = rand(500, world.w - 500);
-    b.y = rand(500, world.h - 500);
+    b.x = rand(800, world.w - 800);
+    b.y = rand(800, world.h - 800);
     b.score = 0;
-    b.targetLen = rand(9, 16);
+    b.targetLen = rand(9, 15);
+    b.spawnGrace = 2.0;
     b.segments = [];
     for (let k = 0; k < Math.floor(b.targetLen); k++) {
         b.segments.push({ x: b.x, y: b.y, r: b.baseRadius * 0.9 });
@@ -113,16 +112,17 @@ function updateBots(dt) {
             return;
         }
 
+        if (b.spawnGrace > 0) b.spawnGrace -= dt;
+
         const ai = b.ai;
         ai.retargetT -= dt;
         const head = b.segments[0];
 
-        // AI Target selection
         if (ai.retargetT <= 0) {
-            ai.retargetT = rand(0.5, 1.5);
+            ai.retargetT = rand(0.3, 1.2);
             let bestFood = null, bestD2 = Infinity;
-            const scanCount = Math.min(gameState.foods.length, 30);
-            for (let k = 0; k < scanCount; k++) {
+            const scan = Math.min(gameState.foods.length, 25);
+            for (let k = 0; k < scan; k++) {
                 const f = gameState.foods[(Math.random() * gameState.foods.length) | 0];
                 if (!f) continue;
                 const d2 = dist2(b.x, b.y, f.x, f.y);
@@ -131,22 +131,20 @@ function updateBots(dt) {
             if (bestFood) ai.targetFoodId = bestFood.id;
         }
 
-        let targetX = b.x + Math.cos(b.ang) * 100;
-        let targetY = b.y + Math.sin(b.ang) * 100;
+        let tx = b.x + Math.cos(b.ang) * 100;
+        let ty = b.y + Math.sin(b.ang) * 100;
 
         const targetFood = gameState.foods.find(f => f.id === ai.targetFoodId);
-        if (targetFood) {
-            targetX = targetFood.x;
-            targetY = targetFood.y;
-        }
+        if (targetFood) { tx = targetFood.x; ty = targetFood.y; }
 
-        const margin = 400;
-        if (b.x < margin) targetX = b.x + 1000;
-        if (b.x > world.w - margin) targetX = b.x - 1000;
-        if (b.y < margin) targetY = b.y + 1000;
-        if (b.y > world.h - margin) targetY = b.y - 1000;
+        // Stronger wall avoidance
+        const m = 500;
+        if (b.x < m) tx = b.x + 1000;
+        else if (b.x > world.w - m) tx = b.x - 1000;
+        if (b.y < m) ty = b.y + 1000;
+        else if (b.y > world.h - m) ty = b.y - 1000;
 
-        const desiredAng = Math.atan2(targetY - b.y, targetX - b.x);
+        const desiredAng = Math.atan2(ty - b.y, tx - b.x);
         let da = wrapAngle(desiredAng - b.ang);
         b.ang += clamp(da, -b.turnAssist * dt, b.turnAssist * dt);
 
@@ -161,8 +159,7 @@ function updateBots(dt) {
         for (let i = 1; i < b.segments.length; i++) {
             const prev = b.segments[i - 1];
             const seg = b.segments[i];
-            const dx = seg.x - prev.x;
-            const dy = seg.y - prev.y;
+            const dx = seg.x - prev.x, dy = seg.y - prev.y;
             const d = Math.sqrt(dx * dx + dy * dy) || 0.001;
             if (d > b.segDist) {
                 const t = (d - b.segDist) / d;
@@ -171,10 +168,12 @@ function updateBots(dt) {
             }
         }
 
-        const eatDist2 = (b.baseRadius * 1.8) * (b.baseRadius * 1.8);
+        // Eat Food
+        const rr = b.baseRadius * 1.6;
+        const rr2 = rr * rr;
         for (let i = gameState.foods.length - 1; i >= 0; i--) {
             const f = gameState.foods[i];
-            if (dist2(b.x, b.y, f.x, f.y) < eatDist2) {
+            if (dist2(b.x, b.y, f.x, f.y) < rr2) {
                 gameState.foods.splice(i, 1);
                 removeFoodFromGrid(f);
                 io.emit('foodEaten', { foodId: f.id, playerId: b.id });
@@ -190,29 +189,26 @@ function updateBots(dt) {
             }
         }
 
-        // --- ENHANCED SERVER-SIDE COLLISION ---
+        // Collision
+        if (b.spawnGrace > 0) return;
+
         if (b.x < 0 || b.x > world.w || b.y < 0 || b.y > world.h) {
             b.dead = true;
             io.emit('playerKilled', { victimId: b.id });
             return;
         }
 
-        const allSnakes = [...Array.from(gameState.players.values()), ...bots];
-        for (const other of allSnakes) {
-            if (other.dead) continue;
-            if (other.id === b.id) continue; // Disable self-collision for bots as well
-
-            const segs = other.segments || [];
+        const all = [...Array.from(gameState.players.values()), ...bots];
+        for (const o of all) {
+            if (o.dead || o.id === b.id) continue;
+            const segs = o.segments || [];
             for (let i = 0; i < segs.length; i++) {
-                const seg = segs[i];
-                if (!seg) continue;
-
-                const otherR = seg.r || 10.8;
-                // Increased collision distance factor from 0.65 to 0.85 to account for network latency
-                const collDist = (b.baseRadius * 0.85 + otherR * 0.85);
-                if (dist2(b.x, b.y, seg.x, seg.y) < collDist * collDist) {
+                const s = segs[i];
+                if (!s) continue;
+                const rSum = (b.baseRadius * 0.75 + (s.r || 10) * 0.75);
+                if (dist2(b.x, b.y, s.x, s.y) < rSum * rSum) {
                     b.dead = true;
-                    io.emit('playerKilled', { victimId: b.id, killerId: other.id });
+                    io.emit('playerKilled', { victimId: b.id, killerId: o.id });
                     return;
                 }
             }
@@ -228,16 +224,12 @@ setInterval(() => {
             score: b.score, segments: b.segments, targetLen: b.targetLen,
             dead: b.dead, baseRadius: b.baseRadius
         })));
-    } catch (e) {
-        console.error("Bot update error:", e);
-    }
+    } catch (e) { console.error(e); }
 }, 50);
 
 spawnFood();
 
 io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
-
     socket.emit('init', {
         id: socket.id,
         foods: gameState.foods,
@@ -246,11 +238,11 @@ io.on('connection', (socket) => {
     });
 
     socket.on('join', (data) => {
-        const player = {
+        const p = {
             id: socket.id,
             name: data.name || "Anonim",
-            x: rand(500, world.w - 500),
-            y: rand(500, world.h - 500),
+            x: rand(800, world.w - 800),
+            y: rand(800, world.h - 800),
             hue: rand(0, 360),
             score: 0,
             targetLen: 10,
@@ -258,46 +250,43 @@ io.on('connection', (socket) => {
             baseRadius: 12,
             segments: []
         };
-        for (let k = 0; k < 10; k++) player.segments.push({ x: player.x, y: player.y, r: 10.8 });
-        gameState.players.set(socket.id, player);
-        io.emit('playerJoined', player);
+        for (let k = 0; k < 10; k++) p.segments.push({ x: p.x, y: p.y, r: 10.8 });
+        gameState.players.set(socket.id, p);
+        io.emit('playerJoined', p);
     });
 
     socket.on('update', (data) => {
-        const player = gameState.players.get(socket.id);
-        if (player && !player.dead) {
-            Object.assign(player, data);
-            socket.broadcast.emit('playerUpdate', player);
+        const p = gameState.players.get(socket.id);
+        if (p && !p.dead) {
+            Object.assign(p, data);
+            socket.broadcast.emit('playerUpdate', p);
         }
     });
 
-    socket.on('eat', (foodId) => {
-        const idx = gameState.foods.findIndex(f => f.id === foodId);
-        if (idx !== -1) {
-            const food = gameState.foods[idx];
-            gameState.foods.splice(idx, 1);
-            removeFoodFromGrid(food);
-            io.emit('foodEaten', { foodId, playerId: socket.id });
+    socket.on('eat', (id) => {
+        const i = gameState.foods.findIndex(f => f.id === id);
+        if (i !== -1) {
+            const f = gameState.foods[i];
+            gameState.foods.splice(i, 1);
+            removeFoodFromGrid(f);
+            io.emit('foodEaten', { foodId: id, playerId: socket.id });
             spawnFood(1);
             io.emit('foodSpawned', gameState.foods[gameState.foods.length - 1]);
         }
     });
 
     socket.on('kill', (data) => {
-        const player = gameState.players.get(socket.id);
-        if (player) {
-            player.dead = true;
+        const p = gameState.players.get(socket.id);
+        if (p) {
+            p.dead = true;
             io.emit('playerKilled', { victimId: socket.id, killerId: data?.killerId });
         }
     });
 
     socket.on('disconnect', () => {
-        console.log('User disconnected:', socket.id);
         gameState.players.delete(socket.id);
         io.emit('playerLeft', socket.id);
     });
 });
 
-httpServer.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
-});
+httpServer.listen(PORT, () => console.log(`Server on ${PORT}`));
