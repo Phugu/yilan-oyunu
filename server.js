@@ -63,7 +63,6 @@ function createBot(i) {
         id,
         name,
         isBot: true,
-        isPlayer: false,
         x: rand(500, world.w - 500),
         y: rand(500, world.h - 500),
         vx: 0, vy: 0,
@@ -77,6 +76,7 @@ function createBot(i) {
         turnAssist: rand(6.0, 7.2),
         segDist: 9.5,
         baseRadius: 12,
+        dead: false,
         ai: {
             targetFoodId: null,
             retargetT: 0,
@@ -89,17 +89,27 @@ function createBot(i) {
     return b;
 }
 
-const bots = [];
+let bots = [];
 for (let i = 0; i < BOT_COUNT; i++) {
     bots.push(createBot(i));
+}
+
+function respawnBot(b) {
+    b.dead = false;
+    b.x = rand(500, world.w - 500);
+    b.y = rand(500, world.h - 500);
+    b.score = 0;
+    b.targetLen = rand(9, 16);
+    b.segments = [];
+    for (let k = 0; k < Math.floor(b.targetLen); k++) {
+        b.segments.push({ x: b.x, y: b.y, r: b.baseRadius * 0.9 });
+    }
 }
 
 function updateBots(dt) {
     bots.forEach(b => {
         if (b.dead) {
-            b.dead = false; // Reset for now
-            b.x = rand(500, world.w - 500);
-            b.y = rand(500, world.h - 500);
+            respawnBot(b);
             return;
         }
 
@@ -107,46 +117,47 @@ function updateBots(dt) {
         ai.retargetT -= dt;
         const head = b.segments[0];
 
-        // Simple Bot AI
+        // AI Target selection
         if (ai.retargetT <= 0) {
             ai.retargetT = rand(0.5, 1.5);
             let bestFood = null, bestD2 = Infinity;
-            // Scan random foods
-            for (let k = 0; k < 20; k++) {
+            // Scan for nearby food
+            const scanCount = Math.min(gameState.foods.length, 30);
+            for (let k = 0; k < scanCount; k++) {
                 const f = gameState.foods[(Math.random() * gameState.foods.length) | 0];
                 if (!f) continue;
-                const d2 = dist2(head.x, head.y, f.x, f.y);
+                const d2 = dist2(b.x, b.y, f.x, f.y);
                 if (d2 < bestD2) { bestD2 = d2; bestFood = f; }
             }
             if (bestFood) ai.targetFoodId = bestFood.id;
         }
 
-        let tx = b.x + Math.cos(b.ang) * 100;
-        let ty = b.y + Math.sin(b.ang) * 100;
+        let targetX = b.x + Math.cos(b.ang) * 100;
+        let targetY = b.y + Math.sin(b.ang) * 100;
 
         const targetFood = gameState.foods.find(f => f.id === ai.targetFoodId);
         if (targetFood) {
-            tx = targetFood.x;
-            ty = targetFood.y;
+            targetX = targetFood.x;
+            targetY = targetFood.y;
         }
 
-        // Avoid walls
-        const margin = 300;
-        if (b.x < margin) tx = b.x + 500;
-        if (b.x > world.w - margin) tx = b.x - 500;
-        if (b.y < margin) ty = b.y + 500;
-        if (b.y > world.h - margin) ty = b.y - 500;
+        // Avoid boundaries
+        const margin = 400;
+        if (b.x < margin) targetX = b.x + 1000;
+        if (b.x > world.w - margin) targetX = b.x - 1000;
+        if (b.y < margin) targetY = b.y + 1000;
+        if (b.y > world.h - margin) targetY = b.y - 1000;
 
-        const desiredAng = Math.atan2(ty - b.y, tx - b.x);
+        const desiredAng = Math.atan2(targetY - b.y, targetX - b.x);
         let da = wrapAngle(desiredAng - b.ang);
         b.ang += clamp(da, -b.turnAssist * dt, b.turnAssist * dt);
 
-        const speed = b.baseSpeed;
-        b.vx = Math.cos(b.ang) * speed;
-        b.vy = Math.sin(b.ang) * speed;
+        b.vx = Math.cos(b.ang) * b.baseSpeed;
+        b.vy = Math.sin(b.ang) * b.baseSpeed;
         b.x += b.vx * dt;
         b.y += b.vy * dt;
 
+        // Head update
         head.x = b.x;
         head.y = b.y;
 
@@ -154,7 +165,8 @@ function updateBots(dt) {
         for (let i = 1; i < b.segments.length; i++) {
             const prev = b.segments[i - 1];
             const seg = b.segments[i];
-            const dx = seg.x - prev.x, dy = seg.y - prev.y;
+            const dx = seg.x - prev.x;
+            const dy = seg.y - prev.y;
             const d = Math.sqrt(dx * dx + dy * dy) || 0.001;
             if (d > b.segDist) {
                 const t = (d - b.segDist) / d;
@@ -163,12 +175,12 @@ function updateBots(dt) {
             }
         }
 
-        // Eat food (simplified server-side for bots)
-        const nearbyFoods = gameState.foods.filter(f => dist2(b.x, b.y, f.x, f.y) < 50 * 50);
-        for (const f of nearbyFoods) {
-            const idx = gameState.foods.indexOf(f);
-            if (idx !== -1) {
-                gameState.foods.splice(idx, 1);
+        // Eat food
+        const eatDist2 = (b.baseRadius * 1.5) * (b.baseRadius * 1.5);
+        for (let i = gameState.foods.length - 1; i >= 0; i--) {
+            const f = gameState.foods[i];
+            if (dist2(b.x, b.y, f.x, f.y) < eatDist2) {
+                gameState.foods.splice(i, 1);
                 removeFoodFromGrid(f);
                 io.emit('foodEaten', { foodId: f.id, playerId: b.id });
                 b.score += 5;
@@ -177,9 +189,34 @@ function updateBots(dt) {
                     const last = b.segments[b.segments.length - 1];
                     b.segments.push({ x: last.x, y: last.y, r: b.baseRadius * 0.9 });
                 }
-
                 spawnFood(1);
                 io.emit('foodSpawned', gameState.foods[gameState.foods.length - 1]);
+                break; // One food per tick
+            }
+        }
+
+        // Server-side Collision for bots
+        // against walls
+        if (b.x < 0 || b.x > world.w || b.y < 0 || b.y > world.h) {
+            b.dead = true;
+            io.emit('playerKilled', { victimId: b.id });
+            return;
+        }
+
+        // against other snakes
+        const allSnakes = [...Array.from(gameState.players.values()), ...bots];
+        for (const other of allSnakes) {
+            if (other.id === b.id || other.dead) continue;
+
+            for (let i = 0; i < other.segments.length; i++) {
+                if (other.id === b.id && i < 10) continue; // Skip head self-collision
+                const seg = other.segments[i];
+                const collDist = (b.baseRadius * 0.7 + (seg.r || 10) * 0.7);
+                if (dist2(b.x, b.y, seg.x, seg.y) < collDist * collDist) {
+                    b.dead = true;
+                    io.emit('playerKilled', { victimId: b.id, killerId: other.id });
+                    return;
+                }
             }
         }
     });
@@ -187,11 +224,16 @@ function updateBots(dt) {
 
 // Tick loop
 setInterval(() => {
-    updateBots(0.05); // 20Hz
-    io.emit('botUpdates', bots.map(b => ({
-        id: b.id, name: b.name, x: b.x, y: b.y, ang: b.ang, hue: b.hue,
-        score: b.score, segments: b.segments, targetLen: b.targetLen
-    })));
+    try {
+        updateBots(0.05); // 20Hz
+        io.emit('botUpdates', bots.map(b => ({
+            id: b.id, name: b.name, x: b.x, y: b.y, ang: b.ang, hue: b.hue,
+            score: b.score, segments: b.segments, targetLen: b.targetLen,
+            dead: b.dead
+        })));
+    } catch (e) {
+        console.error("Bot update error:", e);
+    }
 }, 50);
 
 spawnFood();
@@ -218,6 +260,7 @@ io.on('connection', (socket) => {
             dead: false,
             segments: []
         };
+        for (let k = 0; k < 10; k++) player.segments.push({ x: player.x, y: player.y });
         gameState.players.set(socket.id, player);
         io.emit('playerJoined', player);
     });

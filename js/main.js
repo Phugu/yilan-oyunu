@@ -187,6 +187,7 @@ state.socket.on('botUpdates', (botList) => {
             s.targetSegments = b.segments;
             s.score = b.score;
             s.targetLen = b.targetLen;
+            s.dead = b.dead;
         }
     });
 });
